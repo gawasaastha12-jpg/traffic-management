@@ -1,17 +1,16 @@
 "use client";
 
 import React from "react";
-import { MapContainer, TileLayer, Marker, Popup, Circle } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, Popup, Circle, Polyline } from "react-leaflet";
 import L from "leaflet";
 import { useTraffic, Junction, Ambulance } from "@/context/TrafficContext";
 
-// Fix Leaflet issue where images are searched in relative paths
-// Using custom divIcons resolves this elegantly while providing modern glowing markers.
+// Glowing pulse animations for junctions
 const getJunctionIcon = (junction: Junction) => {
   let pulseClass = "marker-glow-emerald";
   
   if (junction.greenCorridorActive) {
-    pulseClass = "marker-glow-cyan";
+    pulseClass = "marker-glow-green-corridor";
   } else if (junction.status === "warning") {
     pulseClass = "marker-glow-amber";
   } else if (junction.status === "critical") {
@@ -27,6 +26,7 @@ const getJunctionIcon = (junction: Junction) => {
   });
 };
 
+// SVG Icon for Ambulances
 const getAmbulanceIcon = (ambulance: Ambulance) => {
   return L.divIcon({
     className: "relative",
@@ -49,11 +49,51 @@ const getAmbulanceIcon = (ambulance: Ambulance) => {
   });
 };
 
+// SVG Icon for BMTC Buses
+const getBusIcon = (bus: any) => {
+  return L.divIcon({
+    className: "relative",
+    iconSize: [22, 22],
+    iconAnchor: [11, 11],
+    popupAnchor: [0, -11],
+    html: `
+      <div class="flex items-center justify-center w-6 h-6 rounded-lg bg-indigo-600 border border-slate-300 shadow-[0_0_8px_rgba(99,102,241,0.5)]">
+        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="text-white">
+          <rect x="4" y="4" width="16" height="16" rx="2" />
+          <path d="M8 8h8"/>
+          <path d="M8 12h8"/>
+          <path d="M12 16h.01"/>
+        </svg>
+      </div>
+    `,
+  });
+};
+
+// Warning alerts icon mapping (TomTom incidents)
+const getIncidentIcon = (severity: string) => {
+  const color = severity === "critical" ? "bg-red-500/20 border-red-500 text-red-500" : "bg-amber-500/20 border-amber-500 text-amber-500";
+  return L.divIcon({
+    className: "relative",
+    iconSize: [22, 22],
+    iconAnchor: [11, 11],
+    popupAnchor: [0, -11],
+    html: `
+      <div class="flex items-center justify-center w-6 h-6 rounded-full border ${color} shadow-[0_0_10px_rgba(239,68,68,0.2)] animate-pulse">
+        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/>
+          <line x1="12" y1="9" x2="12" y2="13"/>
+          <line x1="12" y1="17" x2="12.01" y2="17"/>
+        </svg>
+      </div>
+    `,
+  });
+};
+
 export default function InteractiveMap() {
-  const { junctions, ambulances, toggleGreenCorridor, overrideSignalMode } = useTraffic();
+  const { junctions, ambulances, activeBuses, alerts, toggleGreenCorridor, overrideSignalMode, weather, activeCorridor } = useTraffic();
 
   // Whitefield area central coordinates
-  const position: [number, number] = [12.972, 77.735];
+  const position: [number, number] = [12.9698, 77.7500];
 
   return (
     <div className="w-full h-full relative overflow-hidden rounded-2xl border border-slate-800/80">
@@ -63,17 +103,29 @@ export default function InteractiveMap() {
         scrollWheelZoom={true}
         className="w-full h-full z-10"
       >
-        {/* CartoDB Dark Matter tile layer for an elegant, glowing dark mode map */}
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
           url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
         />
 
-        {/* Heatmap overlay (simulated with transparent circles around congested nodes) */}
+        {/* Rain overlay - if weather records precipitation, render a subtle blue wash over the map */}
+        {weather.rainfall > 0.0 && (
+          <Circle
+            center={position}
+            radius={4000}
+            pathOptions={{
+              fillColor: "#0284c7",
+              fillOpacity: Math.min(0.12, weather.rainfall * 0.02),
+              stroke: false
+            }}
+          />
+        )}
+
+        {/* Heatmap overlay (transparent circles around congested nodes) */}
         {junctions.map((junction) => {
           if (junction.congestionLevel > 50 && !junction.greenCorridorActive) {
             const color = junction.congestionLevel > 80 ? "#ef4444" : "#fbbf24";
-            const radius = junction.congestionLevel * 5; // higher congestion = larger radius
+            const radius = junction.congestionLevel * 5;
             return (
               <Circle
                 key={`heat-${junction.id}`}
@@ -89,6 +141,34 @@ export default function InteractiveMap() {
           }
           return null;
         })}
+
+        {/* Active Emergency Corridor Polyline Overlay */}
+        {activeCorridor && activeCorridor.routeCoordinates && activeCorridor.routeCoordinates.length > 0 && (
+          <>
+            {/* Glowing outer polyline */}
+            <Polyline
+              positions={activeCorridor.routeCoordinates}
+              pathOptions={{
+                color: "#10b981",
+                weight: 8,
+                opacity: 0.35,
+                lineCap: "round",
+                lineJoin: "round"
+              }}
+            />
+            {/* Bright inner polyline */}
+            <Polyline
+              positions={activeCorridor.routeCoordinates}
+              pathOptions={{
+                color: "#059669",
+                weight: 4,
+                opacity: 0.9,
+                lineCap: "round",
+                lineJoin: "round"
+              }}
+            />
+          </>
+        )}
 
         {/* Junction Markers */}
         {junctions.map((junction) => (
@@ -130,14 +210,8 @@ export default function InteractiveMap() {
                     <span className="text-slate-400">Signal Mode:</span>
                     <span className="font-semibold text-cyan-400">{junction.signalMode}</span>
                   </div>
-                  {junction.greenCorridorActive && (
-                    <div className="mt-1 text-center py-0.5 px-1 bg-cyan-950/60 border border-cyan-800/80 text-cyan-400 font-bold rounded text-[10px] animate-pulse">
-                      GREEN CORRIDOR ACTIVE
-                    </div>
-                  )}
                 </div>
 
-                {/* Control Panel Actions */}
                 <div className="flex flex-col gap-1.5 pt-1">
                   <button
                     onClick={() => toggleGreenCorridor(junction.id)}
@@ -191,7 +265,7 @@ export default function InteractiveMap() {
                 <div className="p-3 bg-slate-950 text-slate-100 rounded-lg min-w-[200px] border border-slate-800 shadow-xl font-sans text-xs">
                   <div className="flex justify-between items-center mb-2 pb-1.5 border-b border-red-900/40">
                     <span className="font-bold text-red-400 font-mono">{amb.vehicleNo}</span>
-                    <span className="text-[10px] px-1.5 py-0.5 bg-red-500/10 border border-red-500/20 text-red-400 rounded-full font-bold animate-pulse">
+                    <span className="text-[10px] px-1.5 py-0.5 bg-red-500/10 border border-red-500/20 text-red-400 rounded-full font-bold">
                       {amb.status}
                     </span>
                   </div>
@@ -206,46 +280,89 @@ export default function InteractiveMap() {
                       <span className="text-slate-400">Hospital ETA:</span>{" "}
                       <span className="font-semibold text-cyan-400 font-mono">{amb.eta} mins</span>
                     </div>
-                    <div>
-                      <span className="text-slate-400">Corridor Signal:</span>{" "}
-                      <span
-                        className={`font-semibold ${
-                          amb.greenCorridorRequested ? "text-cyan-400" : "text-amber-400"
-                        }`}
-                      >
-                        {amb.greenCorridorRequested ? "Engaged (Green)" : "Not Engaged"}
-                      </span>
-                    </div>
                   </div>
                 </div>
               </Popup>
             </Marker>
           ))}
+
+        {/* Live BMTC Bus Layer */}
+        {activeBuses.map((bus) => (
+          <Marker
+            key={bus.id}
+            position={[bus.lat, bus.lng]}
+            icon={getBusIcon(bus)}
+          >
+            <Popup>
+              <div className="p-3 bg-slate-950 text-slate-100 rounded-lg min-w-[160px] border border-slate-800 shadow-xl font-sans text-xs">
+                <div className="flex justify-between items-center mb-2 pb-1 border-b border-indigo-900/40">
+                  <span className="font-bold text-indigo-400 font-mono">{bus.route_no}</span>
+                  <span className="text-[9px] px-1.5 bg-indigo-500/10 text-indigo-400 rounded border border-indigo-500/20">BMTC BUS</span>
+                </div>
+                <div>
+                  <span className="text-slate-400">Status:</span>{" "}
+                  <span className="font-semibold text-emerald-400 font-mono">{bus.status}</span>
+                </div>
+              </div>
+            </Popup>
+          </Marker>
+        ))}
+
+        {/* Live Incident Markers (TomTom Ingestion) */}
+        {alerts
+          .filter((a) => !a.resolved && a.id.startsWith("inc-"))
+          .map((alert: any) => {
+            // Find coordinate points from alert model if attached
+            // Using default offsets to prevent map crash if missing coords
+            const lat = alert.lat || 12.9739 + (Math.random() - 0.5) * 0.02;
+            const lng = alert.lng || 77.7126 + (Math.random() - 0.5) * 0.02;
+            return (
+              <Marker
+                key={alert.id}
+                position={[lat, lng]}
+                icon={getIncidentIcon(alert.severity)}
+              >
+                <Popup>
+                  <div className="p-3 bg-slate-950 text-slate-100 rounded-lg min-w-[180px] border border-slate-800 shadow-xl font-sans text-xs">
+                    <h4 className="font-bold text-red-400 mb-1 flex items-center gap-1.5">
+                      ⚠️ {alert.title}
+                    </h4>
+                    <p className="text-slate-300 leading-relaxed">{alert.message}</p>
+                  </div>
+                </Popup>
+              </Marker>
+            );
+          })}
       </MapContainer>
 
       {/* Floating Map Legend */}
-      <div className="absolute bottom-4 left-4 z-20 glass-panel p-3 rounded-xl flex flex-col gap-1.5 font-mono text-[10px] text-slate-300">
-        <span className="font-bold text-xs text-slate-200 border-b border-slate-800 pb-1 mb-1">MAP LEGEND</span>
+      <div className="absolute bottom-4 left-4 z-20 glass-panel p-3 rounded-xl flex flex-col gap-1.5 font-mono text-[9px] text-slate-300">
+        <span className="font-bold text-xs text-slate-200 border-b border-slate-800 pb-1 mb-1">LIVE DIGITAL TWIN LAYERS</span>
         <div className="flex items-center gap-2">
           <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
-          <span>Junction Normal (Flow &lt; 50%)</span>
+          <span>Junction Normal (&lt; 50% delay)</span>
         </div>
         <div className="flex items-center gap-2">
           <span className="w-2.5 h-2.5 rounded-full bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)]" />
-          <span>Junction Warning (Flow 50%-80%)</span>
+          <span>Junction Warning (50%-80% delay)</span>
         </div>
         <div className="flex items-center gap-2">
           <span className="w-2.5 h-2.5 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]" />
-          <span>Junction Critical (Flow &gt; 80%)</span>
+          <span>Junction Critical (&gt; 80% delay)</span>
         </div>
         <div className="flex items-center gap-2">
-          <span className="w-2.5 h-2.5 rounded-full bg-cyan-500 shadow-[0_0_8px_rgba(6,182,212,0.5)]" />
-          <span>Green Corridor Priority Active</span>
+          <span className="w-2.5 h-2.5 rounded-full bg-indigo-500" />
+          <span>Live BMTC Bus Transponder</span>
         </div>
-        <div className="flex items-center gap-2 mt-1">
-          <span className="w-4 h-4 rounded bg-red-600 border border-white flex items-center justify-center text-[8px] font-bold text-white shadow-md">🚑</span>
+        <div className="flex items-center gap-2">
+          <span className="w-2.5 h-2.5 rounded-full bg-red-600 border border-white" />
           <span>Active Ambulance Transponder</span>
         </div>
+        {weather.rainfall > 0.0 && (
+          <div className="text-cyan-400 font-bold mt-1 uppercase text-[8px] animate-pulse">
+            🌧️ RAIN OVERLAY ACTIVE ({weather.rainfall} mm/h)
+          </div>
+        )}
       </div>
     </div>
   );

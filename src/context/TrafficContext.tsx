@@ -2,18 +2,36 @@
 
 import React, { createContext, useContext, useState, useEffect } from "react";
 import {
+  Junction,
+  EmergencyAlert,
+  Ambulance,
   INITIAL_JUNCTIONS,
   INITIAL_ALERTS,
   INITIAL_AMBULANCES,
 } from "@/lib/mockData";
-import type { Junction, EmergencyAlert, Ambulance } from "@/lib/mockData";
-export type { Junction, EmergencyAlert, Ambulance };
 
+interface WeatherState {
+  rainfall: number;
+  visibility: number;
+  humidity: number;
+  condition: string;
+  timestamp?: string;
+}
+
+interface BusState {
+  id: string;
+  route_no: string;
+  lat: number;
+  lng: number;
+  status: string;
+}
 
 interface TrafficContextType {
   junctions: Junction[];
   alerts: EmergencyAlert[];
   ambulances: Ambulance[];
+  weather: WeatherState;
+  activeBuses: BusState[];
   currentUser: { username: string; role: string } | null;
   settings: {
     criticalThreshold: number;
@@ -25,9 +43,14 @@ interface TrafficContextType {
   logout: () => void;
   toggleGreenCorridor: (junctionId: string) => void;
   overrideSignalMode: (junctionId: string, mode: Junction["signalMode"]) => void;
-  triggerEmergencyRoute: (source: string, destination: string, vehicleNo: string) => void;
+  triggerEmergencyRoute: (source: string, destination: string, vehicleNo: string, vehicleType?: string, priorityLevel?: number) => void;
   resolveAlert: (alertId: string) => void;
   updateSettings: (newSettings: any) => void;
+  isLiveConnected: boolean;
+  activeCorridor: any;
+  activeCorridorsList: any[];
+  corridorHistory: any[];
+  cancelCorridor: (corridorId: string) => Promise<void>;
 }
 
 const TrafficContext = createContext<TrafficContextType | undefined>(undefined);
@@ -36,14 +59,77 @@ export function TrafficProvider({ children }: { children: React.ReactNode }) {
   const [junctions, setJunctions] = useState<Junction[]>(INITIAL_JUNCTIONS);
   const [alerts, setAlerts] = useState<EmergencyAlert[]>(INITIAL_ALERTS);
   const [ambulances, setAmbulances] = useState<Ambulance[]>(INITIAL_AMBULANCES);
+  const [weather, setWeather] = useState<WeatherState>({
+    rainfall: 0.0,
+    visibility: 10000.0,
+    humidity: 60.0,
+    condition: "Clear"
+  });
+  const [activeBuses, setActiveBuses] = useState<BusState[]>([]);
   const [currentUser, setCurrentUser] = useState<{ username: string; role: string } | null>(null);
-  
+  const [isLiveConnected, setIsLiveConnected] = useState(false);
+  const [activeCorridor, setActiveCorridor] = useState<any>(null);
+  const [activeCorridorsList, setActiveCorridorsList] = useState<any[]>([]);
+  const [corridorHistory, setCorridorHistory] = useState<any[]>([]);
+
   const [settings, setSettings] = useState({
     criticalThreshold: 80,
     warningThreshold: 50,
     aiOptimizationInterval: 30,
     alertsEnabled: true,
   });
+
+  // Fetch active corridors and history from the API
+  const fetchCorridors = async () => {
+    try {
+      const resActive = await fetch("http://127.0.0.1:8000/api/emergency/active");
+      if (resActive.ok) {
+        const data = await resActive.json();
+        setActiveCorridorsList(data);
+        if (data.length > 0) {
+          const current = data[0];
+          const parsedNodes = JSON.parse(current.route_nodes || "[]");
+          const fallbackCoords = parsedNodes
+            .map((nodeId: string) => {
+              const j = junctions.find((junc) => junc.id === nodeId);
+              return j ? [j.lat, j.lng] : null;
+            })
+            .filter((c: any) => c !== null);
+
+          setActiveCorridor({
+            id: current.id,
+            vehicleNo: current.vehicle_no || "EMERGENCY",
+            vehicleType: current.vehicle_type,
+            priorityLevel: current.priority_level,
+            routeNodes: parsedNodes,
+            routeCoordinates: fallbackCoords,
+            progress: current.vehicle_progress_percentage,
+            etaRemaining: current.eta_after,
+            junctions: [],
+            distanceKm: current.distance_km,
+            timeSaved: current.time_saved_seconds,
+            source: current.origin_name || "Emergency Start",
+            destination: current.destination_name || "Hospital"
+          });
+        } else {
+          setActiveCorridor(null);
+        }
+      }
+      const resHistory = await fetch("http://127.0.0.1:8000/api/emergency/history");
+      if (resHistory.ok) {
+        const data = await resHistory.json();
+        setCorridorHistory(data);
+      }
+    } catch (e) {
+      console.warn("[API] Failed to fetch corridors list/history:", e);
+    }
+  };
+
+  useEffect(() => {
+    if (isLiveConnected) {
+      fetchCorridors();
+    }
+  }, [isLiveConnected]);
 
   // Load session from localStorage if client-side
   useEffect(() => {
@@ -52,6 +138,337 @@ export function TrafficProvider({ children }: { children: React.ReactNode }) {
       setCurrentUser(JSON.parse(savedUser));
     }
   }, []);
+
+  // Live WebSocket Integration
+  useEffect(() => {
+    let socket: WebSocket | null = null;
+    let reconnectTimeout: any = null;
+
+    const connectWS = () => {
+      try {
+        console.log("[WS] Connecting to FastAPI traffic broadcast...");
+        socket = new WebSocket("ws://127.0.0.1:8000/api/ws/traffic");
+
+        socket.onopen = () => {
+          console.log("[WS] Connected to live Digital Twin backend!");
+          setIsLiveConnected(true);
+        };
+
+        socket.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            
+            // Check for emergency events first
+            if (data.event === "EMERGENCY_CREATED" || data.event === "GREEN_CORRIDOR_ACTIVATED") {
+              const vehicleNo = data.vehicle_no || "EMERGENCY";
+              const source = data.origin_name || "Emergency Start";
+              const destination = data.destination_name || "Vydehi Hospital";
+              
+              setActiveCorridor({
+                id: data.corridor_id,
+                vehicleNo: vehicleNo,
+                vehicleType: data.vehicle_type,
+                priorityLevel: data.priority,
+                routeNodes: data.route_nodes || [],
+                routeCoordinates: data.route_coordinates || [],
+                progress: 0,
+                etaRemaining: data.eta_after || 300,
+                junctions: data.junctions || [],
+                distanceKm: data.distance_km || 1.5,
+                timeSaved: data.time_saved || 120,
+                source: source,
+                destination: destination
+              });
+
+              setAmbulances((prev) => {
+                const filtered = prev.filter(a => a.id !== data.corridor_id && a.vehicleNo !== vehicleNo);
+                const newAmb: Ambulance = {
+                  id: data.corridor_id,
+                  vehicleNo: vehicleNo,
+                  source: source,
+                  destination: destination,
+                  status: "En-Route",
+                  eta: Math.round((data.eta_after || 300) / 60.0),
+                  lat: data.route_coordinates?.[0]?.[0] || 12.9698,
+                  lng: data.route_coordinates?.[0]?.[1] || 77.7500,
+                  greenCorridorRequested: true,
+                };
+                return [newAmb, ...filtered];
+              });
+
+              if (data.junctions) {
+                setJunctions((prev) =>
+                  prev.map((j) =>
+                    data.junctions.includes(j.id) ? { ...j, greenCorridorActive: true } : j
+                  )
+                );
+              }
+              fetchCorridors();
+            } else if (data.event === "EMERGENCY_UPDATED") {
+              setActiveCorridor((prev: any) => {
+                if (!prev || prev.id !== data.corridor_id) return prev;
+                return {
+                  ...prev,
+                  progress: data.progress,
+                  etaRemaining: data.eta_remaining
+                };
+              });
+
+              setAmbulances((prev) =>
+                prev.map((a) => {
+                  if (a.id === data.corridor_id || a.vehicleNo === data.vehicle_no) {
+                    return {
+                      ...a,
+                      eta: Math.round(data.eta_remaining / 60.0),
+                      lat: data.current_vehicle_coords?.lat || a.lat,
+                      lng: data.current_vehicle_coords?.lng || a.lng,
+                      status: data.progress === 100 ? "Completed" : a.status
+                    };
+                  }
+                  return a;
+                })
+              );
+
+              if (data.released_junctions && data.released_junctions.length > 0) {
+                setJunctions((prev) =>
+                  prev.map((j) =>
+                    data.released_junctions.includes(j.id) ? { ...j, greenCorridorActive: false } : j
+                  )
+                );
+              }
+            } else if (data.event === "GREEN_CORRIDOR_COMPLETED") {
+              setActiveCorridor(null);
+              setAmbulances((prev) =>
+                prev.map((a) => {
+                  if (a.id === data.corridor_id || a.vehicleNo === data.vehicle_no) {
+                    return { ...a, status: "Completed", eta: 0 };
+                  }
+                  return a;
+                })
+              );
+              setJunctions((prev) =>
+                prev.map((j) => ({ ...j, greenCorridorActive: false }))
+              );
+              fetchCorridors();
+            }
+
+            if (data.type === "telemetry_update") {
+              // Map incoming backend states to React state models
+              if (data.junctions) {
+                const mappedJunctions = data.junctions.map((j: any) => {
+                  let status: Junction["status"] = "normal";
+                  if (j.congestion_level >= settings.criticalThreshold) {
+                    status = "critical";
+                  } else if (j.congestion_level >= settings.warningThreshold) {
+                    status = "warning";
+                  }
+
+                  return {
+                    id: j.id,
+                    name: j.name,
+                    lat: j.lat,
+                    lng: j.lng,
+                    status,
+                    congestionLevel: j.congestion_level,
+                    queueLength: Math.round(j.congestion_level * 4.2),
+                    activeLanes: j.green_corridor_active ? 4 : 3,
+                    signalMode: j.signal_mode,
+                    greenCorridorActive: j.green_corridor_active,
+                    averageWaitTime: j.average_wait_time
+                  };
+                });
+                setJunctions(mappedJunctions);
+              }
+
+              if (data.incidents) {
+                const mappedAlerts = data.incidents.map((inc: any) => ({
+                  id: inc.id,
+                  title: inc.title,
+                  message: inc.message,
+                  time: "Just now",
+                  severity: inc.severity,
+                  resolved: false
+                }));
+                // Merge with existing manual alerts
+                setAlerts((prev) => {
+                  const manualAlerts = prev.filter(a => a.id.startsWith("a-"));
+                  return [...mappedAlerts, ...manualAlerts];
+                });
+              }
+
+              if (data.weather) {
+                setWeather(data.weather);
+              }
+
+              if (data.active_buses) {
+                setActiveBuses(data.active_buses);
+              }
+            }
+          } catch (err) {
+            console.error("[WS] Error parsing WebSocket message:", err);
+          }
+        };
+
+        socket.onclose = () => {
+          console.log("[WS] Connection lost. Reconnecting in 5s...");
+          setIsLiveConnected(false);
+          reconnectTimeout = setTimeout(connectWS, 5000);
+        };
+
+        socket.onerror = () => {
+          setIsLiveConnected(false);
+        };
+      } catch (err) {
+        console.error("[WS] WebSocket setup error:", err);
+        setIsLiveConnected(false);
+      }
+    };
+
+    connectWS();
+
+    return () => {
+      if (socket) socket.close();
+      if (reconnectTimeout) clearTimeout(reconnectTimeout);
+    };
+  }, [settings]);
+
+  // REST API hooks for override controls
+  const toggleGreenCorridor = async (junctionId: string) => {
+    // Optimistic UI update locally
+    setJunctions((prev) =>
+      prev.map((j) => {
+        if (j.id === junctionId) {
+          const newStatus = !j.greenCorridorActive;
+          return {
+            ...j,
+            greenCorridorActive: newStatus,
+            congestionLevel: newStatus ? Math.max(10, j.congestionLevel - 40) : j.congestionLevel,
+            status: newStatus ? "normal" : j.congestionLevel > settings.criticalThreshold ? "critical" : "normal",
+          };
+        }
+        return j;
+      })
+    );
+
+    // If backend is active, send override post
+    if (isLiveConnected) {
+      try {
+        await fetch(`http://127.0.0.1:8000/api/traffic/corridor/${junctionId}`, {
+          method: "POST"
+        });
+      } catch (e) {
+        console.warn("[API] Failed to post corridor toggle to server, fallback local active.");
+      }
+    }
+  };
+
+  const overrideSignalMode = async (junctionId: string, mode: Junction["signalMode"]) => {
+    setJunctions((prev) =>
+      prev.map((j) => (j.id === junctionId ? { ...j, signalMode: mode } : j))
+    );
+
+    if (isLiveConnected) {
+      try {
+        await fetch(`http://127.0.0.1:8000/api/traffic/mode/${junctionId}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ mode })
+        });
+      } catch (e) {
+        console.warn("[API] Failed to post signal override to server.");
+      }
+    }
+  };
+
+  const cancelCorridor = async (corridorId: string) => {
+    if (isLiveConnected) {
+      try {
+        const response = await fetch(`http://127.0.0.1:8000/api/emergency/cancel`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ corridor_id: corridorId })
+        });
+        if (response.ok) {
+          console.log("[API] Corridor cancelled successfully");
+          setActiveCorridor(null);
+          fetchCorridors();
+        }
+      } catch (e) {
+        console.warn("[API] Failed to cancel corridor:", e);
+      }
+    } else {
+      setActiveCorridor(null);
+      setAmbulances((prev) =>
+        prev.map(a => a.id === corridorId ? { ...a, status: "Completed" } : a)
+      );
+    }
+  };
+
+  const triggerEmergencyRoute = async (
+    source: string,
+    destination: string,
+    vehicleNo: string,
+    vehicleType: string = "ambulance",
+    priorityLevel: number = 1
+  ) => {
+    // 1. Resolve coordinates
+    const srcJunction = junctions.find(j => j.name === source || j.id === source);
+    const originCoords = srcJunction ? { lat: srcJunction.lat, lon: srcJunction.lng } : { lat: 12.9841, lon: 77.7523 };
+    
+    let destCoords = { lat: 12.9772, lon: 77.7297 }; // Default Vydehi
+    if (destination.includes("Sakra")) {
+      destCoords = { lat: 12.9667, lon: 77.7188 };
+    } else if (destination.includes("Manipal")) {
+      destCoords = { lat: 12.9739, lon: 77.7126 };
+    } else if (destination.includes("Columbia") || destination.includes("Varthur")) {
+      destCoords = { lat: 12.9575, lon: 77.7442 };
+    } else {
+      const destJunction = junctions.find(j => j.name === destination || j.id === destination);
+      if (destJunction) {
+        destCoords = { lat: destJunction.lat, lon: destJunction.lng };
+      }
+    }
+
+    const localId = `amb-${Date.now()}`;
+    const newAmbulance: Ambulance = {
+      id: localId,
+      vehicleNo,
+      source,
+      destination,
+      status: "En-Route",
+      eta: 8,
+      lat: originCoords.lat,
+      lng: originCoords.lon,
+      greenCorridorRequested: true,
+    };
+    setAmbulances((prev) => [newAmbulance, ...prev]);
+
+    if (isLiveConnected) {
+      try {
+        const response = await fetch(`http://127.0.0.1:8000/api/emergency/create`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            vehicle_type: vehicleType.toLowerCase(),
+            priority_level: priorityLevel,
+            origin: originCoords,
+            destination: destCoords,
+            vehicle_no: vehicleNo,
+            origin_name: source,
+            destination_name: destination
+          })
+        });
+        if (response.ok) {
+          console.log("[API] Emergency corridor created successfully!");
+          fetchCorridors();
+        } else {
+          console.error("[API] Failed to create emergency corridor", await response.text());
+        }
+      } catch (e) {
+        console.warn("[API] Failed to post emergency corridor creation to server.");
+      }
+    }
+  };
 
   const login = (username: string) => {
     const user = { username, role: "Traffic Operations Manager" };
@@ -65,108 +482,6 @@ export function TrafficProvider({ children }: { children: React.ReactNode }) {
     localStorage.removeItem("renew_user");
   };
 
-  const toggleGreenCorridor = (junctionId: string) => {
-    setJunctions((prev) =>
-      prev.map((j) => {
-        if (j.id === junctionId) {
-          const newStatus = !j.greenCorridorActive;
-          return {
-            ...j,
-            greenCorridorActive: newStatus,
-            // If green corridor becomes active, congestion drops, wait time drops, status becomes normal
-            congestionLevel: newStatus ? Math.max(10, j.congestionLevel - 40) : j.congestionLevel,
-            queueLength: newStatus ? Math.max(10, j.queueLength - 100) : j.queueLength,
-            status: newStatus ? "normal" : j.congestionLevel > settings.criticalThreshold ? "critical" : j.congestionLevel > settings.warningThreshold ? "warning" : "normal",
-            averageWaitTime: newStatus ? 15 : j.averageWaitTime,
-          };
-        }
-        return j;
-      })
-    );
-
-    // Create an alert
-    const targetJunction = junctions.find((j) => j.id === junctionId);
-    if (targetJunction) {
-      const active = !targetJunction.greenCorridorActive;
-      const newAlert: EmergencyAlert = {
-        id: `a-${Date.now()}`,
-        title: active ? "Green Corridor Activated" : "Green Corridor Terminated",
-        message: active 
-          ? `Priority emergency corridor has been established at ${targetJunction.name}. Signals adjusted.`
-          : `Priority routing has ended at ${targetJunction.name}. Signal control reverted to Adaptive AI.`,
-        time: "Just now",
-        severity: active ? "critical" : "info",
-        junctionId,
-        resolved: false,
-      };
-      setAlerts((prev) => [newAlert, ...prev]);
-    }
-  };
-
-  const overrideSignalMode = (junctionId: string, mode: Junction["signalMode"]) => {
-    setJunctions((prev) =>
-      prev.map((j) => (j.id === junctionId ? { ...j, signalMode: mode } : j))
-    );
-
-    const targetJunction = junctions.find((j) => j.id === junctionId);
-    if (targetJunction) {
-      const newAlert: EmergencyAlert = {
-        id: `a-${Date.now()}`,
-        title: `Signal Override: ${mode}`,
-        message: `Control mode for ${targetJunction.name} changed to ${mode}.`,
-        time: "Just now",
-        severity: mode === "Manual Override" ? "warning" : "info",
-        junctionId,
-        resolved: false,
-      };
-      setAlerts((prev) => [newAlert, ...prev]);
-    }
-  };
-
-  const triggerEmergencyRoute = (source: string, destination: string, vehicleNo: string) => {
-    // Add ambulance
-    const newAmbulance: Ambulance = {
-      id: `amb-${Date.now()}`,
-      vehicleNo,
-      source,
-      destination,
-      status: "En-Route",
-      eta: 8,
-      lat: 12.972, // Midpoint between junctions
-      lng: 77.735,
-      greenCorridorRequested: true,
-    };
-    setAmbulances((prev) => [newAmbulance, ...prev]);
-
-    // Set junctions along path to green corridor
-    // Let's pretend Vydehi (j-2) and Hope Farm (j-1) are on the path
-    setJunctions((prev) =>
-      prev.map((j) => {
-        if (j.id === "j-1" || j.id === "j-2") {
-          return {
-            ...j,
-            greenCorridorActive: true,
-            congestionLevel: Math.max(15, Math.round(j.congestionLevel / 3)),
-            queueLength: Math.max(10, Math.round(j.queueLength / 3)),
-            averageWaitTime: 10,
-            status: "normal",
-          };
-        }
-        return j;
-      })
-    );
-
-    const newAlert: EmergencyAlert = {
-      id: `a-${Date.now()}`,
-      title: "Emergency Corridor Deployed",
-      message: `Ambulance ${vehicleNo} dispatched. Automatic signals green-lighted from ${source} to ${destination}.`,
-      time: "Just now",
-      severity: "critical",
-      resolved: false,
-    };
-    setAlerts((prev) => [newAlert, ...prev]);
-  };
-
   const resolveAlert = (alertId: string) => {
     setAlerts((prev) =>
       prev.map((a) => (a.id === alertId ? { ...a, resolved: true } : a))
@@ -177,44 +492,37 @@ export function TrafficProvider({ children }: { children: React.ReactNode }) {
     setSettings((prev) => ({ ...prev, ...newSettings }));
   };
 
-  // Simulate traffic changes over time
+  // Telemetry drift loop (runs locally ONLY if WebSocket is offline)
   useEffect(() => {
+    if (isLiveConnected) return;
+
     const interval = setInterval(() => {
       setJunctions((prev) =>
         prev.map((j) => {
-          // If green corridor is active, don't increase congestion
           if (j.greenCorridorActive) return j;
-
-          // Add a random walk to traffic
           const change = Math.round((Math.random() - 0.5) * 8);
           const newCongestion = Math.max(10, Math.min(100, j.congestionLevel + change));
           
-          let newStatus: Junction["status"] = "normal";
+          let status: Junction["status"] = "normal";
           if (newCongestion >= settings.criticalThreshold) {
-            newStatus = "critical";
+            status = "critical";
           } else if (newCongestion >= settings.warningThreshold) {
-            newStatus = "warning";
+            status = "warning";
           }
-
-          const queueChange = Math.round((change > 0 ? 1 : -1) * Math.random() * 25);
-          const newQueue = Math.max(5, j.queueLength + queueChange);
-
-          const waitChange = Math.round((change > 0 ? 1 : -1) * Math.random() * 8);
-          const newWait = Math.max(5, j.averageWaitTime + waitChange);
 
           return {
             ...j,
             congestionLevel: newCongestion,
-            status: newStatus,
-            queueLength: newQueue,
-            averageWaitTime: newWait,
+            status,
+            queueLength: Math.max(5, j.queueLength + Math.round(change * 4)),
+            averageWaitTime: Math.max(5, j.averageWaitTime + change)
           };
         })
       );
     }, 8000);
 
     return () => clearInterval(interval);
-  }, [settings]);
+  }, [settings, isLiveConnected]);
 
   return (
     <TrafficContext.Provider
@@ -222,6 +530,8 @@ export function TrafficProvider({ children }: { children: React.ReactNode }) {
         junctions,
         alerts,
         ambulances,
+        weather,
+        activeBuses,
         currentUser,
         settings,
         login,
@@ -231,6 +541,11 @@ export function TrafficProvider({ children }: { children: React.ReactNode }) {
         triggerEmergencyRoute,
         resolveAlert,
         updateSettings,
+        isLiveConnected,
+        activeCorridor,
+        activeCorridorsList,
+        corridorHistory,
+        cancelCorridor
       }}
     >
       {children}
@@ -245,3 +560,4 @@ export function useTraffic() {
   }
   return context;
 }
+export type { Junction, EmergencyAlert, Ambulance };

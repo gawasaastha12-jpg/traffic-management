@@ -36,7 +36,7 @@ export interface Ambulance {
 
 export const INITIAL_JUNCTIONS: Junction[] = [
   {
-    id: "j-1",
+    id: "WF_J_001",
     name: "Hope Farm Junction",
     lat: 12.9841,
     lng: 77.7523,
@@ -49,7 +49,7 @@ export const INITIAL_JUNCTIONS: Junction[] = [
     averageWaitTime: 145,
   },
   {
-    id: "j-2",
+    id: "WF_J_002",
     name: "Vydehi Hospital Junction",
     lat: 12.9772,
     lng: 77.7297,
@@ -62,7 +62,7 @@ export const INITIAL_JUNCTIONS: Junction[] = [
     averageWaitTime: 88,
   },
   {
-    id: "j-3",
+    id: "WF_J_003",
     name: "Graphite India Junction",
     lat: 12.9739,
     lng: 77.7126,
@@ -75,7 +75,7 @@ export const INITIAL_JUNCTIONS: Junction[] = [
     averageWaitTime: 210,
   },
   {
-    id: "j-4",
+    id: "WF_J_004",
     name: "Kundalahalli Gate Junction",
     lat: 12.9667,
     lng: 77.7188,
@@ -88,7 +88,7 @@ export const INITIAL_JUNCTIONS: Junction[] = [
     averageWaitTime: 35,
   },
   {
-    id: "j-5",
+    id: "WF_J_005",
     name: "Hoodi Junction",
     lat: 12.9918,
     lng: 77.7161,
@@ -101,7 +101,7 @@ export const INITIAL_JUNCTIONS: Junction[] = [
     averageWaitTime: 42,
   },
   {
-    id: "j-6",
+    id: "WF_J_006",
     name: "Varthur Kodi Junction",
     lat: 12.9575,
     lng: 77.7442,
@@ -114,7 +114,7 @@ export const INITIAL_JUNCTIONS: Junction[] = [
     averageWaitTime: 75,
   },
   {
-    id: "j-7",
+    id: "WF_J_007",
     name: "Kadugodi Bridge Junction",
     lat: 12.9976,
     lng: 77.7602,
@@ -135,7 +135,7 @@ export const INITIAL_ALERTS: EmergencyAlert[] = [
     message: "Emergency ambulance AMB-204 dispatched from Varthur Kodi. Priority routing active on ITPL Road.",
     time: "2 mins ago",
     severity: "critical",
-    junctionId: "j-6",
+    junctionId: "WF_J_006",
     resolved: false,
   },
   {
@@ -144,7 +144,7 @@ export const INITIAL_ALERTS: EmergencyAlert[] = [
     message: "Traffic warden engaged manual override at Graphite India Junction due to minor collision blocking Lane C.",
     time: "10 mins ago",
     severity: "warning",
-    junctionId: "j-3",
+    junctionId: "WF_J_003",
     resolved: false,
   },
   {
@@ -153,7 +153,7 @@ export const INITIAL_ALERTS: EmergencyAlert[] = [
     message: "Hope Farm Junction currently exceeding critical capacity. AI routing suggestions pushed to navigation systems.",
     time: "15 mins ago",
     severity: "warning",
-    junctionId: "j-1",
+    junctionId: "WF_J_001",
     resolved: false,
   },
   {
@@ -162,7 +162,7 @@ export const INITIAL_ALERTS: EmergencyAlert[] = [
     message: "Induction loop sensor in Lane A at Hoodi Junction reporting calibration warning.",
     time: "45 mins ago",
     severity: "info",
-    junctionId: "j-5",
+    junctionId: "WF_J_005",
     resolved: true,
   },
 ];

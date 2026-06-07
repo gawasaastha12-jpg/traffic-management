@@ -1,36 +1,88 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# RENEW - Smart Traffic Intelligence (Phase 2: Live Digital Twin)
 
-## Getting Started
+RENEW is a real-time Traffic Intelligence Digital Twin and Micro-Simulation Portal representing Bengaluru (Whitefield) traffic. Phase 2 features live integration frameworks for TomTom (live flow & incidents), OpenWeatherMap (precipitations & visibility risks), OpenRouteService Routing (dynamic ETA matrices), and local NetworkX/SUMO micro-simulations.
 
-First, run the development server:
+---
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+## 🏗️ Project Architecture
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+* **Frontend**: Next.js 16 + TypeScript + Tailwind CSS + Leaflet maps (dynamic client-only rendering)
+* **Backend**: FastAPI + SQLite (local database telemetry) + OSMnx/NetworkX (file-based GraphML road grids)
+* **WebSockets**: In-memory WebSocket ConnectionManager for real-time live map broadcasts
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+---
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## 🚀 Get Started
 
-## Learn More
+Follow these steps to run both the frontend and backend entirely on your Windows laptop.
 
-To learn more about Next.js, take a look at the following resources:
+### Prerequisite
+Ensure **Node.js (v20+)** and **Python (v3.10+)** are installed on your Windows machine and available in your shell's PATH.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+---
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### Step 1: Set Up Python Backend
 
-## Deploy on Vercel
+1. Navigate to the `backend` directory:
+   ```powershell
+   cd backend
+   ```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+2. Create a local Python virtual environment:
+   ```powershell
+   python -m venv .venv
+   ```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+3. Activate the virtual environment:
+   ```powershell
+   .venv\Scripts\Activate.ps1
+   ```
+
+4. Install the backend dependencies:
+   ```powershell
+   pip install -r requirements.txt
+   ```
+   *(Note: This installs `osmnx` and its dependencies. On Windows, pip handles wheels automatically. If you encounter issue building fiona/shapely, ensure Microsoft C++ Build Tools are active).*
+
+5. Configure your API keys in the `backend/.env` file:
+   ```env
+    TOMTOM_API_KEY=YOUR_TOMTOM_API_KEY
+    OPENWEATHER_API_KEY=YOUR_OPENWEATHER_API_KEY
+    ORS_API_KEY=YOUR_OPENROUTE_SERVICE_API_KEY
+   ```
+   *If keys are omitted, the backend automatically runs local simulations and generates mock telemetry updates, allowing you to test the entire interface offline!*
+
+6. Start the FastAPI backend server:
+   ```powershell
+   uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+   ```
+
+You can view the interactive OpenAPI documentation at `http://127.0.0.1:8000/docs`.
+
+---
+
+### Step 2: Set Up Next.js Frontend
+
+1. Open a new PowerShell terminal at the root directory (`traffic management`).
+2. Reload environment variables if needed:
+   ```powershell
+   $env:PATH = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+   ```
+3. Boot the development server:
+   ```powershell
+   npm run dev
+   ```
+4. Open [http://localhost:3000](http://localhost:3000) in your browser.
+
+---
+
+## 🚦 Live Interface Control Features
+
+Once both servers are running:
+1. **Live Network Map**: Next.js automatically connects via WebSockets (`ws://127.0.0.1:8000/api/ws/traffic`) to receive live vehicle density updates.
+2. **CCTV Feed & Override**: Click on any junction marker on the map or select a terminal on the **Junctions** page to view live camera simulations and toggle green corridors.
+3. **Emergency Routing**: Deploy a priority ambulance on the **Emergency Control** page. The backend will calculate dynamic ETAs utilizing the **OpenRouteService directions API** (or fallback local NetworkX Dijkstra paths).
+4. **Rain Overlay**: If the weather API (or simulator) reports active precipitation, a subtle blue rain wash overlay dynamically appears on the Leaflet map, accompanied by warning risk metrics.
+5. **Simulation Engine (SUMO)**: 
+   * If you have SUMO installed on your Windows machine, launch the SUMO server listening on port `8813`. The backend's `SumoAdapter` will automatically interface with it.
+   * If SUMO is not found, the server silently falls back to a lightweight, built-in NetworkX routing flow simulator.
