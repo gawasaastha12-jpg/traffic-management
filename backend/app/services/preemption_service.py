@@ -2,7 +2,7 @@ import asyncio
 import json
 from sqlalchemy.orm import Session
 from app.db import SessionLocal
-from app.models import JunctionModel, EmergencyCorridorModel
+from app.models import JunctionModel, EmergencyCorridorModel, CorridorAnalyticsModel
 from app.services.websocket_manager import websocket_manager
 from app.services.sumo_adapter import sumo_adapter
 
@@ -129,6 +129,15 @@ class PreemptionService:
                         # Mark completed
                         corridor.status = "COMPLETED"
                         db.add(corridor)
+
+                        # Write to analytics table
+                        analytics_record = CorridorAnalyticsModel(
+                            corridor_id=corridor_id,
+                            time_saved_seconds=corridor.time_saved_seconds,
+                            distance_km=corridor.distance_km,
+                            junctions_controlled=corridor.junction_count
+                        )
+                        db.add(analytics_record)
                         
                         # Release final destination junction
                         final_junctions = db.query(JunctionModel).filter(JunctionModel.id.in_(route_nodes)).all()

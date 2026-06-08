@@ -27,6 +27,7 @@ export default function EmergencyControlPage() {
     corridorHistory,
     cancelCorridor,
     triggerEmergencyRoute,
+    triggerReplay,
     isLiveConnected
   } = useTraffic();
 
@@ -429,6 +430,19 @@ export default function EmergencyControlPage() {
                       <span className="text-slate-400 text-[10px]">
                         Saved: <strong className="text-emerald-400">{Math.round(c.time_saved_seconds / 60)}m {c.time_saved_seconds % 60}s</strong>
                       </span>
+                      {c.status === "COMPLETED" && (
+                        <button
+                          onClick={() => triggerReplay(c)}
+                          disabled={!!activeCorridor}
+                          className={`text-[9px] font-mono px-2.5 py-0.5 rounded border transition-all ${
+                            activeCorridor
+                              ? "bg-slate-900 border-slate-800 text-slate-500 cursor-not-allowed"
+                              : "bg-cyan-500/10 border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/25 hover:border-cyan-500/50 cursor-pointer"
+                          }`}
+                        >
+                          Replay
+                        </button>
+                      )}
                       <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${
                         c.status === "COMPLETED"
                           ? "bg-emerald-500/10 text-emerald-450 border border-emerald-900/20"

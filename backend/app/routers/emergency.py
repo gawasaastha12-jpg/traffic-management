@@ -4,7 +4,7 @@ from typing import List, Optional
 from pydantic import BaseModel
 
 from app.db import get_db
-from app.models import EmergencyCorridorModel
+from app.models import EmergencyCorridorModel, CorridorAnalyticsModel
 from app.services.emergency_service import emergency_service
 
 router = APIRouter(prefix="/api/emergency", tags=["Emergency"])
@@ -88,3 +88,37 @@ def get_corridor(corridor_id: str, db: Session = Depends(get_db)):
     if not corridor:
         raise HTTPException(status_code=404, detail="Corridor not found")
     return corridor
+
+@router.get("/summary/analytics")
+def get_analytics(db: Session = Depends(get_db)):
+    """
+    Returns aggregated stats and raw logs from the corridor_analytics database table.
+    """
+    records = db.query(CorridorAnalyticsModel).all()
+    
+    total_corridors = len(records)
+    total_time_saved = sum(r.time_saved_seconds for r in records)
+    total_distance = sum(r.distance_km for r in records)
+    
+    avg_time_saved = total_time_saved / total_corridors if total_corridors > 0 else 0
+    avg_distance = total_distance / total_corridors if total_corridors > 0 else 0
+    
+    return {
+        "summary": {
+            "total_corridors": total_corridors,
+            "total_minutes_saved": round(total_time_saved / 60.0, 1),
+            "total_distance_km": round(total_distance, 2),
+            "average_time_saved_seconds": round(avg_time_saved, 1),
+            "average_distance_km": round(avg_distance, 2)
+        },
+        "records": [
+            {
+                "id": r.id,
+                "corridor_id": r.corridor_id,
+                "time_saved_seconds": r.time_saved_seconds,
+                "distance_km": r.distance_km,
+                "junctions_controlled": r.junctions_controlled,
+                "timestamp": r.timestamp
+            } for r in records
+        ]
+    }

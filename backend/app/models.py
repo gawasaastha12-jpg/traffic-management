@@ -57,3 +57,13 @@ class EmergencyCorridorModel(Base):
     vehicle_progress_percentage = Column(Integer, default=0) # 0, 25, 50, 75, 100
     created_at = Column(String, default=lambda: datetime.datetime.now().isoformat())
 
+class CorridorAnalyticsModel(Base):
+    __tablename__ = "corridor_analytics"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    corridor_id = Column(String, nullable=False)
+    time_saved_seconds = Column(Integer, nullable=False)
+    distance_km = Column(Float, nullable=False)
+    junctions_controlled = Column(Integer, nullable=False)
+    timestamp = Column(String, default=lambda: datetime.datetime.now().isoformat())
+

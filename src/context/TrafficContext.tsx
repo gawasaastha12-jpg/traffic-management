@@ -51,6 +51,7 @@ interface TrafficContextType {
   activeCorridorsList: any[];
   corridorHistory: any[];
   cancelCorridor: (corridorId: string) => Promise<void>;
+  triggerReplay: (corridor: any) => void;
 }
 
 const TrafficContext = createContext<TrafficContextType | undefined>(undefined);
@@ -470,6 +471,112 @@ export function TrafficProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const triggerReplay = (corridor: any) => {
+    const parsedNodes = typeof corridor.route_nodes === "string" 
+      ? JSON.parse(corridor.route_nodes) 
+      : corridor.route_nodes;
+
+    const fallbackCoords = parsedNodes
+      .map((nodeId: string) => {
+        const j = junctions.find((junc) => junc.id === nodeId);
+        return j ? [j.lat, j.lng] : null;
+      })
+      .filter((c: any) => c !== null);
+
+    const vehicleType = corridor.vehicle_type || "ambulance";
+    const vehicleNo = corridor.vehicle_no || `KA-53-${vehicleType === "ambulance" ? "AM" : vehicleType === "fire" ? "FR" : "PL"}-${corridor.id.split("_")[1]?.slice(-4) || "8802"}`;
+
+    setActiveCorridor({
+      id: corridor.id,
+      vehicleNo: vehicleNo,
+      vehicleType: vehicleType,
+      priorityLevel: corridor.priority_level || 1,
+      routeNodes: parsedNodes,
+      routeCoordinates: fallbackCoords,
+      progress: 0,
+      etaRemaining: corridor.eta_after || 0,
+      distanceKm: corridor.distance_km || 0,
+      timeSaved: corridor.time_saved_seconds || 0,
+      source: corridor.origin_name || "Emergency Start",
+      destination: corridor.destination_name || "Hospital",
+      isReplay: true
+    });
+
+    setAmbulances((prev) => {
+      const filtered = prev.filter(a => a.id !== corridor.id);
+      const newAmb: Ambulance = {
+        id: corridor.id,
+        vehicleNo: vehicleNo,
+        source: corridor.origin_name || "Emergency Start",
+        destination: corridor.destination_name || "Hospital",
+        status: "En-Route",
+        eta: Math.round(corridor.eta_after / 60.0) || 5,
+        lat: fallbackCoords[0]?.[0] || 12.9698,
+        lng: fallbackCoords[0]?.[1] || 77.7500,
+        greenCorridorRequested: true,
+      };
+      return [newAmb, ...filtered];
+    });
+
+    // Set junctions active
+    setJunctions((prev) =>
+      prev.map((j) =>
+        parsedNodes.includes(j.id) ? { ...j, greenCorridorActive: true } : j
+      )
+    );
+
+    let currentProgress = 0;
+    const interval = setInterval(() => {
+      currentProgress += 25;
+      if (currentProgress > 100) {
+        clearInterval(interval);
+        setActiveCorridor(null);
+        setAmbulances((prev) =>
+          prev.map(a => a.id === corridor.id ? { ...a, status: "Completed", eta: 0 } : a)
+        );
+        setJunctions((prev) =>
+          prev.map((j) => ({ ...j, greenCorridorActive: false }))
+        );
+      } else {
+        setActiveCorridor((prev: any) => {
+          if (!prev || prev.id !== corridor.id) {
+            clearInterval(interval);
+            return prev;
+          }
+          return {
+            ...prev,
+            progress: currentProgress
+          };
+        });
+        
+        setAmbulances((prev) =>
+          prev.map((a) => {
+            if (a.id === corridor.id) {
+              const cutoff = Math.min(fallbackCoords.length - 1, Math.floor((fallbackCoords.length - 1) * (currentProgress / 100.0)));
+              const currentCoords = fallbackCoords[cutoff] || fallbackCoords[0];
+              
+              // Release junctions behind
+              const crossedNodes = parsedNodes.slice(0, Math.floor(parsedNodes.length * (currentProgress / 100.0)));
+              setJunctions((juncs) =>
+                juncs.map((j) =>
+                  crossedNodes.includes(j.id) ? { ...j, greenCorridorActive: false } : j
+                )
+              );
+
+              return {
+                ...a,
+                lat: currentCoords?.[0] || a.lat,
+                lng: currentCoords?.[1] || a.lng,
+                status: currentProgress === 100 ? "Completed" : a.status
+              };
+            }
+            return a;
+          })
+        );
+      }
+    }, 1000);
+  };
+
   const login = (username: string) => {
     const user = { username, role: "Traffic Operations Manager" };
     setCurrentUser(user);
@@ -545,7 +652,8 @@ export function TrafficProvider({ children }: { children: React.ReactNode }) {
         activeCorridor,
         activeCorridorsList,
         corridorHistory,
-        cancelCorridor
+        cancelCorridor,
+        triggerReplay
       }}
     >
       {children}
