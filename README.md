@@ -1,36 +1,38 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+RENEW — Smart Traffic Intelligence System
 
-## Getting Started
+Predict · Prevent · Optimize
 
-First, run the development server:
+Renew is an AI-powered smart traffic management system built for Bangalore's urban road network. It predicts congestion before it happens, automatically adjusts traffic signals in real time, and clears emergency corridors for ambulances — all from a single live operator dashboard.
 
-```bash
+How It Works-
+
+Predict — AI models analyze live junction data and forecast congestion up to 30 minutes ahead for each junction in the sector.
+Prevent — A swarm of signal agents coordinate with each other to redistribute green phases and prevent gridlock before it forms.
+Optimize — When an emergency vehicle is dispatched, the system computes the fastest route and turns every signal along that path green automatically.
+
+The dashboard streams live telemetry from all junctions via WebSocket, showing real-time congestion levels, active ambulances, and alert notifications for operators.
+
+Tech Stack
+Backend - FastAPI (Python)
+Road Graph - OSMnx + NetworkX (OpenStreetMap)
+Traffic Data - TomTom API (with local simulation fallback)
+Weather -  DataOpenWeatherMap API
+AI / ML - PyTorch, scikit-learn (LSTM + GNN models)
+Simulation - NetworkX local sim (50 vehicles)
+Frontend - Next.js + React
+Map - Leaflet.js
+Real-time -WebSocket
+Styling -Tailwind CSS
+
+Running Locally
+bash# Backend
+cd backend
+pip install -r requirements.txt
+uvicorn app.main:app --reload
+
+# Frontend
+cd frontend
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
-
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Deployed Link - 
