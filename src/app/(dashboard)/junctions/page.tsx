@@ -16,7 +16,8 @@ import {
 } from "lucide-react";
 
 export default function JunctionsPage() {
-  const { junctions, toggleGreenCorridor, overrideSignalMode } = useTraffic();
+  const { junctions, toggleGreenCorridor, overrideSignalMode, currentUser } = useTraffic();
+  const isOperator = currentUser?.role === "Traffic Operations Manager";
   const [selectedJunctionId, setSelectedJunctionId] = useState<string>(junctions[0]?.id || "");
   const [cameraFeedActive, setCameraFeedActive] = useState(true);
 
@@ -204,58 +205,75 @@ export default function JunctionsPage() {
               </div>
 
               {/* Manual Override Controls */}
-              <div className="glass-panel p-5 rounded-2xl flex flex-col gap-3.5">
-                <h3 className="text-xs font-extrabold text-slate-200 tracking-wider uppercase font-mono border-b border-slate-800/40 pb-2 flex items-center gap-2">
-                  <Sliders className="h-4.5 w-4.5 text-amber-500" />
-                  Override Operations
-                </h3>
+              {isOperator ? (
+                <div className="glass-panel p-5 rounded-2xl flex flex-col gap-3.5">
+                  <h3 className="text-xs font-extrabold text-slate-200 tracking-wider uppercase font-mono border-b border-slate-800/40 pb-2 flex items-center gap-2">
+                    <Sliders className="h-4.5 w-4.5 text-amber-500" />
+                    Override Operations
+                  </h3>
 
-                <div className="flex flex-col gap-3">
-                  {/* Select Mode */}
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-[9px] text-slate-500 font-mono uppercase">System Sequencing Mode</label>
-                    <div className="grid grid-cols-3 gap-1">
-                      {["Adaptive AI", "Manual Override", "Fixed Timing"].map((mode) => (
-                        <button
-                          key={mode}
-                          onClick={() => overrideSignalMode(selectedJunction.id, mode as any)}
-                          className={`text-[9px] font-mono py-2 rounded-lg border text-center transition-all ${
-                            selectedJunction.signalMode === mode
-                              ? "bg-cyan-500/10 border-cyan-500 text-cyan-400 font-bold"
-                              : "bg-slate-950 border-slate-900 text-slate-400 hover:text-slate-200"
-                          }`}
-                        >
-                          {mode}
-                        </button>
-                      ))}
+                  <div className="flex flex-col gap-3">
+                    {/* Select Mode */}
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[9px] text-slate-500 font-mono uppercase">System Sequencing Mode</label>
+                      <div className="grid grid-cols-3 gap-1">
+                        {["Adaptive AI", "Manual Override", "Fixed Timing"].map((mode) => (
+                          <button
+                            key={mode}
+                            onClick={() => overrideSignalMode(selectedJunction.id, mode as any)}
+                            className={`text-[9px] font-mono py-2 rounded-lg border text-center transition-all ${
+                              selectedJunction.signalMode === mode
+                                ? "bg-cyan-500/10 border-cyan-500 text-cyan-400 font-bold"
+                                : "bg-slate-950 border-slate-900 text-slate-400 hover:text-slate-200"
+                            }`}
+                          >
+                            {mode}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Manual Controls actions */}
+                    <div className="flex flex-col gap-2 mt-1">
+                      <button
+                        onClick={() => toggleGreenCorridor(selectedJunction.id)}
+                        className={`w-full py-2.5 rounded-xl font-bold text-center text-xs transition-all uppercase flex items-center justify-center gap-2 ${
+                          selectedJunction.greenCorridorActive
+                            ? "bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400"
+                            : "bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 text-cyan-400 shadow-[0_0_12px_rgba(6,182,212,0.1)]"
+                        }`}
+                      >
+                        {selectedJunction.greenCorridorActive ? (
+                          <>
+                            <AlertOctagon className="h-4.5 w-4.5 animate-pulse" />
+                            <span>TERMINATE CORRIDOR PATH</span>
+                          </>
+                        ) : (
+                          <>
+                            <ShieldCheck className="h-4.5 w-4.5" />
+                            <span>ENGAGE EMERGENCY GREEN PATH</span>
+                          </>
+                        )}
+                      </button>
                     </div>
                   </div>
-
-                  {/* Manual Controls actions */}
+                </div>
+              ) : (
+                <div className="glass-panel p-5 rounded-2xl flex flex-col gap-3.5 bg-slate-900/10 border-slate-800/40 text-slate-400 font-mono text-xs">
+                  <h3 className="text-xs font-extrabold text-slate-300 tracking-wider uppercase font-mono border-b border-slate-800/40 pb-2 flex items-center gap-2">
+                    <ShieldCheck className="h-4.5 w-4.5 text-cyan-450" />
+                    Commuter Services
+                  </h3>
                   <div className="flex flex-col gap-2 mt-1">
-                    <button
-                      onClick={() => toggleGreenCorridor(selectedJunction.id)}
-                      className={`w-full py-2.5 rounded-xl font-bold text-center text-xs transition-all uppercase flex items-center justify-center gap-2 ${
-                        selectedJunction.greenCorridorActive
-                          ? "bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400"
-                          : "bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 text-cyan-400 shadow-[0_0_12px_rgba(6,182,212,0.1)]"
-                      }`}
-                    >
-                      {selectedJunction.greenCorridorActive ? (
-                        <>
-                          <AlertOctagon className="h-4.5 w-4.5 animate-pulse" />
-                          <span>TERMINATE CORRIDOR PATH</span>
-                        </>
-                      ) : (
-                        <>
-                          <ShieldCheck className="h-4.5 w-4.5" />
-                          <span>ENGAGE EMERGENCY GREEN PATH</span>
-                        </>
-                      )}
-                    </button>
+                    <p className="text-[11px] leading-relaxed text-slate-400">
+                      Adaptive traffic signals are currently being managed automatically by the Central AI Agent. 
+                    </p>
+                    <div className="p-3.5 bg-cyan-950/20 border border-cyan-900/30 rounded-xl text-cyan-400 text-[10px] leading-relaxed">
+                      <strong>COMMUTER NOTICE:</strong> In case of an emergency vehicle approach, the signal will automatically prioritize their corridor. Please yield immediately.
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
             </div>
           </div>
         ) : (

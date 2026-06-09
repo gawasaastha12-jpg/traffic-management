@@ -31,7 +31,8 @@ import {
 import { DENSITY_TRENDS, VEHICLE_COUNTS, WAIT_TIME_BY_JUNCTION } from "@/lib/mockData";
 
 export default function Dashboard() {
-  const { junctions, alerts, ambulances, resolveAlert } = useTraffic();
+  const { junctions, alerts, ambulances, resolveAlert, currentUser } = useTraffic();
+  const isOperator = currentUser?.role === "Traffic Operations Manager";
 
   // Compute live statistics
   const totalJunctions = junctions.length;
@@ -50,18 +51,20 @@ export default function Dashboard() {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
         <div>
           <h1 className="text-2xl font-extrabold text-slate-100 font-mono tracking-wide uppercase">
-            WHITEFIELD OPERATIONS COMMAND
+            {isOperator ? "WHITEFIELD OPERATIONS COMMAND" : "WHITEFIELD PUBLIC COMMUTER PORTAL"}
           </h1>
           <p className="text-xs text-slate-400 font-mono mt-0.5">
-            Real-time telemetry and adaptive traffic optimization feed.
+            {isOperator ? "Real-time telemetry and adaptive traffic optimization feed." : "Real-time traffic conditions, transit tracking, and safety alerts."}
           </p>
         </div>
-        <div className="flex gap-2">
-          <button className="flex items-center gap-2 px-3 py-1.5 bg-slate-900 border border-slate-800 rounded-lg text-slate-300 hover:text-cyan-400 hover:border-cyan-500/40 text-xs transition-colors font-mono font-semibold">
-            <FileSpreadsheet className="h-4 w-4" />
-            EXPORT TELEMETRY
-          </button>
-        </div>
+        {isOperator && (
+          <div className="flex gap-2">
+            <button className="flex items-center gap-2 px-3 py-1.5 bg-slate-900 border border-slate-800 rounded-lg text-slate-300 hover:text-cyan-400 hover:border-cyan-500/40 text-xs transition-colors font-mono font-semibold">
+              <FileSpreadsheet className="h-4 w-4" />
+              EXPORT TELEMETRY
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Top Statistics Grid */}
@@ -164,12 +167,14 @@ export default function Dashboard() {
                     <p className="text-[11px] leading-relaxed text-slate-400 font-sans">
                       {alert.message}
                     </p>
-                    <button
-                      onClick={() => resolveAlert(alert.id)}
-                      className="self-end text-[10px] text-cyan-400 hover:text-cyan-300 font-mono font-bold mt-1.5 uppercase hover:underline"
-                    >
-                      Acknowledge &rarr;
-                    </button>
+                    {isOperator && (
+                      <button
+                        onClick={() => resolveAlert(alert.id)}
+                        className="self-end text-[10px] text-cyan-400 hover:text-cyan-300 font-mono font-bold mt-1.5 uppercase hover:underline"
+                      >
+                        Acknowledge &rarr;
+                      </button>
+                    )}
                   </div>
                 ))
               )}

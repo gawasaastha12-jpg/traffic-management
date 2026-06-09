@@ -40,6 +40,15 @@ export default function LoginPage() {
     }, 1200);
   };
 
+  const handlePublicAccess = () => {
+    setLoading(true);
+    setTimeout(() => {
+      login("Guest Commuter", "Public Commuter");
+      setLoading(false);
+      router.push("/");
+    }, 800);
+  };
+
   return (
     <div className="relative flex h-screen w-screen items-center justify-center bg-[#05070f] overflow-hidden">
       {/* Abstract Glowing City Network background */}
@@ -136,10 +145,24 @@ export default function LoginPage() {
           </button>
         </form>
 
+        <div className="relative flex items-center justify-center my-1">
+          <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-800/80"></div></div>
+          <span className="relative px-3 text-[10px] text-slate-500 font-mono bg-[#05070f]">OR</span>
+        </div>
+
+        <button
+          onClick={handlePublicAccess}
+          type="button"
+          className="w-full py-3 bg-slate-900/60 hover:bg-slate-800/80 border border-slate-800/80 hover:border-slate-700 text-slate-350 hover:text-slate-100 font-bold rounded-xl transition-all duration-300 flex items-center justify-center gap-2 font-mono text-xs shadow-md hover:shadow-lg"
+        >
+          <User className="h-4 w-4 text-emerald-400" />
+          ACCESS PUBLIC COMMUTER PORTAL
+        </button>
+
         {/* Credentials hints for demo */}
         <div className="border-t border-slate-800/80 pt-4 flex flex-col items-center">
           <span className="text-[10px] text-slate-500 font-mono uppercase tracking-wider">
-            Demo Credentials
+            Operator Credentials
           </span>
           <div className="flex gap-4 text-xs font-mono text-slate-400 mt-1.5">
             <span>User: <strong className="text-cyan-400">ops_admin</strong></span>

@@ -39,7 +39,7 @@ interface TrafficContextType {
     aiOptimizationInterval: number;
     alertsEnabled: boolean;
   };
-  login: (username: string) => boolean;
+  login: (username: string, role?: string) => boolean;
   logout: () => void;
   toggleGreenCorridor: (junctionId: string) => void;
   overrideSignalMode: (junctionId: string, mode: Junction["signalMode"]) => void;
@@ -705,8 +705,8 @@ export function TrafficProvider({ children }: { children: React.ReactNode }) {
     }, 1000);
   };
 
-  const login = (username: string) => {
-    const user = { username, role: "Traffic Operations Manager" };
+  const login = (username: string, role: string = "Traffic Operations Manager") => {
+    const user = { username, role };
     setCurrentUser(user);
     localStorage.setItem("renew_user", JSON.stringify(user));
     return true;

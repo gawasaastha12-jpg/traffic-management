@@ -58,13 +58,14 @@ export default function DashboardLayout({
     return () => clearInterval(timer);
   }, []);
 
+  const isOperator = currentUser?.role === "Traffic Operations Manager";
   const navItems = [
     { name: "Dashboard", href: "/", icon: LayoutDashboard },
     { name: "Junctions", href: "/junctions", icon: Activity },
-    { name: "Emergency Control", href: "/emergency", icon: ShieldAlert },
+    ...(isOperator ? [{ name: "Emergency Control", href: "/emergency", icon: ShieldAlert }] : []),
     { name: "Predictions", href: "/predictions", icon: TrendingUp },
     { name: "Analytics", href: "/analytics", icon: BarChart3 },
-    { name: "Settings", href: "/settings", icon: Settings },
+    ...(isOperator ? [{ name: "Settings", href: "/settings", icon: Settings }] : []),
   ];
 
   const unreadAlertsCount = alerts.filter((a) => !a.resolved).length;
@@ -92,7 +93,7 @@ export default function DashboardLayout({
         <div className="flex flex-col gap-8">
           {/* Logo */}
           <div className="flex items-center gap-3 px-2">
-            <div className="relative flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-500 to-emerald-500 shadow-[0_0_15px_rgba(6,182,212,0.4)]">
+            <div className="relative flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-500 to-emerald-500 shadow-[0_0_15px_rgba(6,182,212,0.45)]">
               <Activity className="h-6 w-6 text-[#060814]" />
             </div>
             <div className="flex flex-col">
@@ -100,7 +101,7 @@ export default function DashboardLayout({
                 RENEW
               </span>
               <span className="text-[10px] text-slate-500 font-mono tracking-widest">
-                SMART TRAFFIC CONTROL
+                {isOperator ? "SMART TRAFFIC CONTROL" : "PUBLIC TRANSIT PORTAL"}
               </span>
             </div>
           </div>
