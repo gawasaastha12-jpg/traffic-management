@@ -104,7 +104,7 @@ class TrafficIngestionService:
             if self.api_key:
                 # TomTom Flow Segment Data endpoint
                 url = (
-                    f"https://api.tomtom.com/traffic/services/4/flowSegmentData/relative-zoom/10/json"
+                    f"https://api.tomtom.com/traffic/services/4/flowSegmentData/relative/10/json"
                     f"?key={self.api_key}&point={j.latitude},{j.longitude}"
                 )
                 try:
@@ -161,17 +161,19 @@ class TrafficIngestionService:
         ]
 
         for j_id, name, lat, lng, cong in initial_junctions:
-            model = JunctionModel(
-                id=j_id,
-                name=name,
-                latitude=lat,
-                longitude=lng,
-                congestion_level=cong,
-                signal_mode="Adaptive AI",
-                green_corridor_active=False,
-                average_wait_time=int(cong * 1.8)
-            )
-            db.add(model)
+            existing = db.query(JunctionModel).filter(JunctionModel.id == j_id).first()
+            if not existing:
+                model = JunctionModel(
+                    id=j_id,
+                    name=name,
+                    latitude=lat,
+                    longitude=lng,
+                    congestion_level=cong,
+                    signal_mode="Adaptive AI",
+                    green_corridor_active=False,
+                    average_wait_time=int(cong * 1.8)
+                )
+                db.add(model)
         db.commit()
 
     def _generate_simulated_incidents(self, db: Session):

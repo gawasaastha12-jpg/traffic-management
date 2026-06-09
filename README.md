@@ -24,55 +24,67 @@ Ensure **Node.js (v20+)** and **Python (v3.10+)** are installed on your Windows 
 ### Step 1: Set Up Python Backend
 
 1. Navigate to the `backend` directory:
-   ```powershell
+   ```bash
    cd backend
    ```
 
 2. Create a local Python virtual environment:
-   ```powershell
+   ```bash
    python -m venv .venv
    ```
 
 3. Activate the virtual environment:
-   ```powershell
-   .venv\Scripts\Activate.ps1
-   ```
+   * **Windows (PowerShell)**:
+     ```powershell
+     .venv\Scripts\Activate.ps1
+     ```
+   * **macOS/Linux**:
+     ```bash
+     source .venv/bin/activate
+     ```
 
 4. Install the backend dependencies:
-   ```powershell
+   ```bash
    pip install -r requirements.txt
    ```
-   *(Note: This installs `osmnx` and its dependencies. On Windows, pip handles wheels automatically. If you encounter issue building fiona/shapely, ensure Microsoft C++ Build Tools are active).*
+   *(Note: This installs `osmnx` and its dependencies. If you are using Python 3.14 on Windows, pip will automatically fetch pre-release compatible wheels).*
 
 5. Configure your API keys in the `backend/.env` file:
    ```env
-    TOMTOM_API_KEY=YOUR_TOMTOM_API_KEY
-    OPENWEATHER_API_KEY=YOUR_OPENWEATHER_API_KEY
-    ORS_API_KEY=YOUR_OPENROUTE_SERVICE_API_KEY
+   TOMTOM_API_KEY=YOUR_TOMTOM_API_KEY
+   OPENWEATHER_API_KEY=YOUR_OPENWEATHER_API_KEY
+   ORS_API_KEY=YOUR_OPENROUTE_SERVICE_API_KEY
    ```
    *If keys are omitted, the backend automatically runs local simulations and generates mock telemetry updates, allowing you to test the entire interface offline!*
 
-6. Start the FastAPI backend server:
-   ```powershell
-   uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
-   ```
-
-You can view the interactive OpenAPI documentation at `http://127.0.0.1:8000/docs`.
-
 ---
 
-### Step 2: Set Up Next.js Frontend
+### Step 2: Set Up Next.js Frontend & Start
 
-1. Open a new PowerShell terminal at the root directory (`traffic management`).
-2. Reload environment variables if needed:
-   ```powershell
-   $env:PATH = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+1. From the **project root directory** (`traffic management`), install frontend dependencies:
+   ```bash
+   npm install
    ```
-3. Boot the development server:
-   ```powershell
-   npm run dev
-   ```
-4. Open [http://localhost:3000](http://localhost:3000) in your browser.
+
+2. Start the application. You can either run both services concurrently, or start them in separate terminals:
+
+   * **Option A: Run everything concurrently (Recommended)**
+     ```bash
+     npm run dev:all
+     ```
+     This starts both the FastAPI backend (on port 8000) and the Next.js frontend (on port 3000) in a single terminal. Hitting `Ctrl + C` stops both servers.
+
+   * **Option B: Run in separate terminals**
+     * Terminal 1 (Backend):
+       ```bash
+       npm run dev:backend
+       ```
+     * Terminal 2 (Frontend):
+       ```bash
+       npm run dev
+       ```
+
+3. Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ---
 

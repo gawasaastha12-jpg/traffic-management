@@ -442,6 +442,130 @@ export function TrafficProvider({ children }: { children: React.ReactNode }) {
       lng: originCoords.lon,
       greenCorridorRequested: true,
     };
+    
+    // Offline/Error Local Simulation Loop
+    const startLocalSimulation = () => {
+      const pathNodes: string[] = [];
+      const srcJ = junctions.find(j => j.name === source || j.id === source);
+      if (srcJ) pathNodes.push(srcJ.id);
+      
+      // Intermediate junctions
+      if (srcJ && srcJ.id !== "WF_J_003") pathNodes.push("WF_J_003");
+      if (srcJ && srcJ.id !== "WF_J_002") pathNodes.push("WF_J_002");
+      
+      const destJ = junctions.find(j => j.name === destination || j.id === destination || destination.includes(j.name) || j.name.includes(destination));
+      if (destJ && !pathNodes.includes(destJ.id)) {
+        pathNodes.push(destJ.id);
+      } else if (!destJ) {
+        const defaultDest = junctions.find(j => j.id === "WF_J_002") || junctions[1];
+        if (defaultDest && !pathNodes.includes(defaultDest.id)) {
+          pathNodes.push(defaultDest.id);
+        }
+      }
+
+      const pathCoords = pathNodes
+        .map((nodeId) => {
+          const j = junctions.find((junc) => junc.id === nodeId);
+          return j ? [j.lat, j.lng] : null;
+        })
+        .filter((c: any) => c !== null);
+
+      if (pathCoords.length === 0) {
+        pathCoords.push([originCoords.lat, originCoords.lon]);
+        pathCoords.push([destCoords.lat, destCoords.lon]);
+      }
+
+      setActiveCorridor({
+        id: localId,
+        vehicleNo: vehicleNo,
+        vehicleType: vehicleType,
+        priorityLevel: priorityLevel,
+        routeNodes: pathNodes,
+        routeCoordinates: pathCoords,
+        progress: 0,
+        etaRemaining: 180,
+        distanceKm: 2.1,
+        timeSaved: 75,
+        source: source,
+        destination: destination,
+        isReplay: false
+      });
+
+      // Force junctions green
+      setJunctions((prev) =>
+        prev.map((j) =>
+          pathNodes.includes(j.id) ? { ...j, greenCorridorActive: true } : j
+        )
+      );
+
+      let currentProgress = 0;
+      const interval = setInterval(() => {
+        currentProgress += 25;
+        if (currentProgress > 100) {
+          clearInterval(interval);
+          setActiveCorridor(null);
+          setAmbulances((prev) =>
+            prev.map(a => a.id === localId ? { ...a, status: "Completed", eta: 0 } : a)
+          );
+          setJunctions((prev) =>
+            prev.map((j) => ({ ...j, greenCorridorActive: false }))
+          );
+          
+          // Add to local history log
+          const newHistoryRecord = {
+            id: localId,
+            vehicle_no: vehicleNo,
+            vehicle_type: vehicleType,
+            origin_name: source,
+            destination_name: destination,
+            time_saved_seconds: 75,
+            eta_before: 255,
+            eta_after: 180,
+            status: "COMPLETED",
+            route_nodes: JSON.stringify(pathNodes)
+          };
+          setCorridorHistory((prev) => [...prev, newHistoryRecord]);
+        } else {
+          setActiveCorridor((prev: any) => {
+            if (!prev || prev.id !== localId) {
+              clearInterval(interval);
+              return prev;
+            }
+            return {
+              ...prev,
+              progress: currentProgress,
+              etaRemaining: Math.round(180 * (1 - currentProgress / 100))
+            };
+          });
+
+          setAmbulances((prev) =>
+            prev.map((a) => {
+              if (a.id === localId) {
+                const cutoff = Math.min(pathCoords.length - 1, Math.floor((pathCoords.length - 1) * (currentProgress / 100.0)));
+                const currentCoords = pathCoords[cutoff] || pathCoords[0];
+                
+                // Release junctions behind
+                const crossedNodes = pathNodes.slice(0, Math.floor(pathNodes.length * (currentProgress / 100.0)));
+                setJunctions((juncs) =>
+                  juncs.map((j) =>
+                    crossedNodes.includes(j.id) ? { ...j, greenCorridorActive: false } : j
+                  )
+                );
+
+                return {
+                  ...a,
+                  lat: currentCoords?.[0] || a.lat,
+                  lng: currentCoords?.[1] || a.lng,
+                  status: currentProgress === 100 ? "Completed" : a.status
+                };
+              }
+              return a;
+            })
+          );
+        }
+      }, 2000);
+    };
+
     setAmbulances((prev) => [newAmbulance, ...prev]);
 
     if (isLiveConnected) {
@@ -464,10 +588,14 @@ export function TrafficProvider({ children }: { children: React.ReactNode }) {
           fetchCorridors();
         } else {
           console.error("[API] Failed to create emergency corridor", await response.text());
+          startLocalSimulation();
         }
       } catch (e) {
-        console.warn("[API] Failed to post emergency corridor creation to server.");
+        console.warn("[API] Failed to post emergency corridor creation to server, starting local fallback simulation.");
+        startLocalSimulation();
       }
+    } else {
+      startLocalSimulation();
     }
   };
 
