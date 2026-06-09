@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # RENEW - Smart Traffic Intelligence (Phase 2: Live Digital Twin)
 
 RENEW is a real-time Traffic Intelligence Digital Twin and Micro-Simulation Portal representing Bengaluru (Whitefield) traffic. Phase 2 features live integration frameworks for TomTom (live flow & incidents), OpenWeatherMap (precipitations & visibility risks), OpenRouteService Routing (dynamic ETA matrices), and local NetworkX/SUMO micro-simulations.
@@ -98,3 +99,43 @@ Once both servers are running:
 5. **Simulation Engine (SUMO)**: 
    * If you have SUMO installed on your Windows machine, launch the SUMO server listening on port `8813`. The backend's `SumoAdapter` will automatically interface with it.
    * If SUMO is not found, the server silently falls back to a lightweight, built-in NetworkX routing flow simulator.
+=======
+RENEW — Smart Traffic Intelligence System
+
+Predict · Prevent · Optimize
+
+Renew is an AI-powered smart traffic management system built for Bangalore's urban road network. It predicts congestion before it happens, automatically adjusts traffic signals in real time, and clears emergency corridors for ambulances — all from a single live operator dashboard.
+
+How It Works-
+
+Predict — AI models analyze live junction data and forecast congestion up to 30 minutes ahead for each junction in the sector.
+Prevent — A swarm of signal agents coordinate with each other to redistribute green phases and prevent gridlock before it forms.
+Optimize — When an emergency vehicle is dispatched, the system computes the fastest route and turns every signal along that path green automatically.
+
+The dashboard streams live telemetry from all junctions via WebSocket, showing real-time congestion levels, active ambulances, and alert notifications for operators.
+
+Tech Stack
+Backend - FastAPI (Python)
+Road Graph - OSMnx + NetworkX (OpenStreetMap)
+Traffic Data - TomTom API (with local simulation fallback)
+Weather -  DataOpenWeatherMap API
+AI / ML - PyTorch, scikit-learn (LSTM + GNN models)
+Simulation - NetworkX local sim (50 vehicles)
+Frontend - Next.js + React
+Map - Leaflet.js
+Real-time -WebSocket
+Styling -Tailwind CSS
+
+Running Locally
+bash# Backend
+cd backend
+pip install -r requirements.txt
+uvicorn app.main:app --reload
+
+# Frontend
+cd frontend
+npm install
+npm run dev
+
+Deployed Link - 
+>>>>>>> 71a010ad4c5503098d0f0513a95519dd9958980c
