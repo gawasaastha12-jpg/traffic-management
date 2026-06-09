@@ -34,7 +34,7 @@ class TrafficIngestionService:
         )
         
         try:
-            response = requests.get(url, timeout=10)
+            response = requests.get(url, timeout=3)
             if response.status_code == 200:
                 data = response.json()
                 incidents_list = data.get("tm", {}).get("poi", [])
@@ -99,6 +99,7 @@ class TrafficIngestionService:
 
         for j in junctions:
             congestion = j.congestion_level
+            use_fallback = not self.api_key
             
             if self.api_key:
                 # TomTom Flow Segment Data endpoint
@@ -107,7 +108,7 @@ class TrafficIngestionService:
                     f"?key={self.api_key}&point={j.latitude},{j.longitude}"
                 )
                 try:
-                    response = requests.get(url, timeout=5)
+                    response = requests.get(url, timeout=2)
                     if response.status_code == 200:
                         flow_data = response.json().get("flowSegmentData", {})
                         current_speed = flow_data.get("currentSpeed", 40)
@@ -116,11 +117,15 @@ class TrafficIngestionService:
                         # Calculate congestion ratio
                         ratio = max(0, min(100, int((1 - (current_speed / max(1, free_speed))) * 100)))
                         congestion = ratio
+                    else:
+                        print(f"[TrafficService] Flow request failed for {j.name} with status {response.status_code}. Using simulation fallback.")
+                        use_fallback = True
                 except Exception as e:
-                    print(f"[TrafficService] Flow request exception for {j.name}: {e}")
+                    print(f"[TrafficService] Flow request exception/timeout for {j.name}: {e}. Using simulation fallback.")
+                    use_fallback = True
 
             # If not using API or API failed, run a slight random walk fluctuation
-            if not self.api_key:
+            if use_fallback:
                 change = random.choice([-5, -3, 0, 3, 5])
                 congestion = max(10, min(100, congestion + change))
 

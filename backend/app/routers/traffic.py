@@ -7,6 +7,8 @@ from app.services.graph_service import graph_service
 
 router = APIRouter(prefix="/api/traffic", tags=["Traffic"])
 
+@router.get("")
+@router.get("/")
 @router.get("/junctions")
 def get_all_junctions(db: Session = Depends(get_db)):
     """
