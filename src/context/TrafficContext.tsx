@@ -56,6 +56,9 @@ interface TrafficContextType {
 
 const TrafficContext = createContext<TrafficContextType | undefined>(undefined);
 
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+const WS_BASE = process.env.NEXT_PUBLIC_WS_URL || "ws://127.0.0.1:8000";
+
 export function TrafficProvider({ children }: { children: React.ReactNode }) {
   const [junctions, setJunctions] = useState<Junction[]>(INITIAL_JUNCTIONS);
   const [alerts, setAlerts] = useState<EmergencyAlert[]>(INITIAL_ALERTS);
@@ -83,7 +86,7 @@ export function TrafficProvider({ children }: { children: React.ReactNode }) {
   // Fetch active corridors and history from the API
   const fetchCorridors = async () => {
     try {
-      const resActive = await fetch("http://127.0.0.1:8000/api/emergency/active");
+      const resActive = await fetch(`${API_BASE}/api/emergency/active`);
       if (resActive.ok) {
         const data = await resActive.json();
         setActiveCorridorsList(data);
@@ -116,7 +119,7 @@ export function TrafficProvider({ children }: { children: React.ReactNode }) {
           setActiveCorridor(null);
         }
       }
-      const resHistory = await fetch("http://127.0.0.1:8000/api/emergency/history");
+      const resHistory = await fetch(`${API_BASE}/api/emergency/history`);
       if (resHistory.ok) {
         const data = await resHistory.json();
         setCorridorHistory(data);
@@ -148,7 +151,7 @@ export function TrafficProvider({ children }: { children: React.ReactNode }) {
     const connectWS = () => {
       try {
         console.log("[WS] Connecting to FastAPI traffic broadcast...");
-        socket = new WebSocket("ws://127.0.0.1:8000/api/ws/traffic");
+        socket = new WebSocket(`${WS_BASE}/api/ws/traffic`);
 
         socket.onopen = () => {
           console.log("[WS] Connected to live Digital Twin backend!");
@@ -354,7 +357,7 @@ export function TrafficProvider({ children }: { children: React.ReactNode }) {
     // If backend is active, send override post
     if (isLiveConnected) {
       try {
-        await fetch(`http://127.0.0.1:8000/api/traffic/corridor/${junctionId}`, {
+        await fetch(`${API_BASE}/api/traffic/corridor/${junctionId}`, {
           method: "POST"
         });
       } catch (e) {
@@ -370,7 +373,7 @@ export function TrafficProvider({ children }: { children: React.ReactNode }) {
 
     if (isLiveConnected) {
       try {
-        await fetch(`http://127.0.0.1:8000/api/traffic/mode/${junctionId}`, {
+        await fetch(`${API_BASE}/api/traffic/mode/${junctionId}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ mode })
@@ -384,7 +387,7 @@ export function TrafficProvider({ children }: { children: React.ReactNode }) {
   const cancelCorridor = async (corridorId: string) => {
     if (isLiveConnected) {
       try {
-        const response = await fetch(`http://127.0.0.1:8000/api/emergency/cancel`, {
+        const response = await fetch(`${API_BASE}/api/emergency/cancel`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ corridor_id: corridorId })
@@ -570,7 +573,7 @@ export function TrafficProvider({ children }: { children: React.ReactNode }) {
 
     if (isLiveConnected) {
       try {
-        const response = await fetch(`http://127.0.0.1:8000/api/emergency/create`, {
+        const response = await fetch(`${API_BASE}/api/emergency/create`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
