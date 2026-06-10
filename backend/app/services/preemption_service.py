@@ -11,7 +11,7 @@ class PreemptionService:
         self.active_loops = {} # Tracks active asyncio tasks for corridor IDs
         self.active_vehicles = {} # Maps corridor IDs to vehicle numbers
 
-    def activate_corridor(self, corridor_id: str, route_nodes: list, vehicle_no: str = None):
+    async def activate_corridor(self, corridor_id: str, route_nodes: list, vehicle_no: str = None):
         """
         Activates preemption along the route nodes and starts the tracking simulation.
         """

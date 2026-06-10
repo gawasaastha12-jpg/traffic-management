@@ -26,7 +26,7 @@ class CancelPayload(BaseModel):
     corridor_id: str
 
 @router.post("/create")
-def create_corridor(payload: EmergencyCreatePayload, db: Session = Depends(get_db)):
+async def create_corridor(payload: EmergencyCreatePayload, db: Session = Depends(get_db)):
     """
     Creates and initiates a green corridor for an emergency vehicle.
     """
@@ -41,7 +41,7 @@ def create_corridor(payload: EmergencyCreatePayload, db: Session = Depends(get_d
             "origin_name": payload.origin_name,
             "destination_name": payload.destination_name
         }
-        corridor = emergency_service.create_emergency_corridor(db, payload_dict)
+        corridor = await emergency_service.create_emergency_corridor(db, payload_dict)
         return {
             "status": "success",
             "corridor_id": corridor.id,

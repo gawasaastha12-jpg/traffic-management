@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 
 export default function JunctionsPage() {
-  const { junctions, toggleGreenCorridor, overrideSignalMode, currentUser } = useTraffic();
+  const { junctions, toggleGreenCorridor, overrideSignalMode, currentUser, isLiveConnected } = useTraffic();
   const isOperator = currentUser?.role === "Traffic Operations Manager";
   const [selectedJunctionId, setSelectedJunctionId] = useState<string>(junctions[0]?.id || "");
   const [cameraFeedActive, setCameraFeedActive] = useState(true);
@@ -28,25 +28,81 @@ export default function JunctionsPage() {
     if (!selectedJunctionId || !cameraFeedActive) return;
 
     const fetchCameraTelemetry = async () => {
-      try {
-        const apiBase = (process.env.NEXT_PUBLIC_API_URL && process.env.NEXT_PUBLIC_API_URL !== "undefined")
-          ? process.env.NEXT_PUBLIC_API_URL
-          : "http://127.0.0.1:8000";
-        console.log("FETCHING camera URL:", `${apiBase}/api/grid/camera/${selectedJunctionId}`);
-        const res = await fetch(`${apiBase}/api/grid/camera/${selectedJunctionId}`);
-        if (res.ok) {
-          const data = await res.json();
-          setYoloResult(data);
+      if (isLiveConnected) {
+        try {
+          const apiBase = (process.env.NEXT_PUBLIC_API_URL && process.env.NEXT_PUBLIC_API_URL !== "undefined")
+            ? process.env.NEXT_PUBLIC_API_URL
+            : "http://127.0.0.1:8000";
+          const res = await fetch(`${apiBase}/api/grid/camera/${selectedJunctionId}`);
+          if (res.ok) {
+            const data = await res.json();
+            setYoloResult(data);
+            return;
+          }
+        } catch (e) {
+          console.warn("Failed to fetch camera YOLO telemetry from backend, using local simulation:", e);
         }
-      } catch (e) {
-        console.error("Failed to fetch camera YOLO telemetry:", e);
       }
+
+      // Local Simulation Fallback (runs if offline or if fetch fails)
+      const queueMeters = selectedJunction ? selectedJunction.queueLength : 100;
+      const numVehicles = Math.max(1, Math.floor(queueMeters / 6.5));
+      const vehicleClasses = ["car", "motorbike", "auto-rickshaw", "bus", "emergency"];
+      const classWeights: Record<string, number> = { emergency: 0.0, bus: 3.0, car: 1.5, motorbike: 0.5, "auto-rickshaw": 1.0 };
+      const colors: Record<string, string> = { emergency: "#f43f5e", bus: "#06b6d4", car: "#10b981", motorbike: "#a855f7", "auto-rickshaw": "#f59e0b" };
+      
+      const detections = [];
+      let totalWeight = 0;
+
+      for (let i = 0; i < numVehicles; i++) {
+        const rand = Math.random();
+        let vType = "car";
+        if (rand < 0.55) vType = "car";
+        else if (rand < 0.75) vType = "motorbike";
+        else if (rand < 0.90) vType = "auto-rickshaw";
+        else if (rand < 0.98) vType = "bus";
+        else vType = "emergency";
+
+        const yBase = Math.floor(40 + (i * 25) % 240);
+        const xBase = Math.floor(120 + (i * 45) % 400 + (Math.random() - 0.5) * 30);
+        const w = (vType === "bus" || vType === "car") ? Math.floor(40 + Math.random() * 30) : Math.floor(25 + Math.random() * 15);
+        const h = (vType === "bus" || vType === "car") ? Math.floor(35 + Math.random() * 20) : Math.floor(25 + Math.random() * 10);
+
+        const xMin = Math.max(10, Math.min(620 - w, xBase));
+        const yMin = Math.max(50, Math.min(330 - h, yBase));
+        const xMax = xMin + w;
+        const yMax = yMin + h;
+
+        const confidence = (82.5 + Math.random() * 16.7).toFixed(1);
+        const weight = classWeights[vType];
+        totalWeight += weight;
+
+        detections.push({
+          id: `det-local-${selectedJunctionId}-${i}`,
+          label: `${vType.toUpperCase()} (${confidence}%)`,
+          box: [xMin, yMin, xMax, yMax],
+          class: vType,
+          color: colors[vType],
+          weight: weight,
+          queue_position: i + 1
+        });
+      }
+
+      const densityPercentage = Math.min(100, Math.round((totalWeight / 40.0) * 100));
+
+      setYoloResult({
+        junction_id: selectedJunctionId,
+        vehicle_count: detections.length,
+        detections: detections,
+        weighted_density_score: densityPercentage,
+        total_weight: Math.round(totalWeight * 10) / 10
+      });
     };
 
     fetchCameraTelemetry();
     const interval = setInterval(fetchCameraTelemetry, 3000); // Poll every 3 seconds for active camera feeds
     return () => clearInterval(interval);
-  }, [selectedJunctionId, cameraFeedActive]);
+  }, [selectedJunctionId, cameraFeedActive, isLiveConnected, selectedJunction]);
 
   // Status visual maps
   const statusColorMap = {

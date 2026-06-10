@@ -86,9 +86,11 @@ export function TrafficProvider({ children }: { children: React.ReactNode }) {
   // Fetch active corridors and history from the API
   const fetchCorridors = async () => {
     try {
+      let activeList: any[] = [];
       const resActive = await fetch(`${API_BASE}/api/emergency/active`);
       if (resActive.ok) {
         const data = await resActive.json();
+        activeList = data;
         setActiveCorridorsList(data);
         if (data.length > 0) {
           const current = data[0];
@@ -119,11 +121,76 @@ export function TrafficProvider({ children }: { children: React.ReactNode }) {
           setActiveCorridor(null);
         }
       }
+
+      let historyList: any[] = [];
       const resHistory = await fetch(`${API_BASE}/api/emergency/history`);
       if (resHistory.ok) {
         const data = await resHistory.json();
+        historyList = data;
         setCorridorHistory(data);
       }
+
+      // Sync both lists with ambulances state (filtering out mock ones)
+      setAmbulances((prev) => {
+        const nonMocks = prev.filter(a => !a.id.startsWith("amb-"));
+        const apiAmbs: Ambulance[] = [];
+
+        // Map active corridors
+        for (const c of activeList) {
+          const parsedNodes = JSON.parse(c.route_nodes || "[]");
+          const fallbackCoords = parsedNodes
+            .map((nodeId: string) => {
+              const j = junctions.find((junc) => junc.id === nodeId);
+              return j ? [j.lat, j.lng] : null;
+            })
+            .filter((cc: any) => cc !== null);
+
+          apiAmbs.push({
+            id: c.id,
+            vehicleNo: c.vehicle_no || `AMB-${c.id.split("_")[1]?.slice(-3) || "999"}`,
+            source: c.origin_name || "Emergency Start",
+            destination: c.destination_name || "Hospital",
+            status: "En-Route",
+            eta: Math.round((c.eta_after || 300) / 60.0),
+            lat: c.origin_lat || fallbackCoords[0]?.[0] || 12.9698,
+            lng: c.origin_lon || fallbackCoords[0]?.[1] || 77.7500,
+            greenCorridorRequested: true,
+          });
+        }
+
+        // Map history corridors
+        for (const c of historyList) {
+          const parsedNodes = JSON.parse(c.route_nodes || "[]");
+          const fallbackCoords = parsedNodes
+            .map((nodeId: string) => {
+              const j = junctions.find((junc) => junc.id === nodeId);
+              return j ? [j.lat, j.lng] : null;
+            })
+            .filter((cc: any) => cc !== null);
+
+          apiAmbs.push({
+            id: c.id,
+            vehicleNo: c.vehicle_no || `AMB-${c.id.split("_")[1]?.slice(-3) || "999"}`,
+            source: c.origin_name || "Emergency Start",
+            destination: c.destination_name || "Hospital",
+            status: "Completed",
+            eta: 0,
+            lat: c.destination_lat || fallbackCoords[fallbackCoords.length - 1]?.[0] || 12.9772,
+            lng: c.destination_lon || fallbackCoords[fallbackCoords.length - 1]?.[1] || 77.7297,
+            greenCorridorRequested: false,
+          });
+        }
+
+        // Merge with non-mocks
+        const merged = [...apiAmbs];
+        for (const old of nonMocks) {
+          if (!merged.find(m => m.id === old.id)) {
+            merged.push(old);
+          }
+        }
+        return merged;
+      });
+
     } catch (e) {
       console.warn("[API] Failed to fetch corridors list/history:", e);
     }
@@ -156,6 +223,8 @@ export function TrafficProvider({ children }: { children: React.ReactNode }) {
         socket.onopen = () => {
           console.log("[WS] Connected to live Digital Twin backend!");
           setIsLiveConnected(true);
+          setAlerts((prev) => prev.filter((a) => !a.id.startsWith("a-")));
+          setAmbulances((prev) => prev.filter((a) => !a.id.startsWith("amb-")));
         };
 
         socket.onmessage = (event) => {
@@ -296,7 +365,7 @@ export function TrafficProvider({ children }: { children: React.ReactNode }) {
                 }));
                 // Merge with existing manual alerts
                 setAlerts((prev) => {
-                  const manualAlerts = prev.filter(a => a.id.startsWith("a-"));
+                  const manualAlerts = prev.filter(a => a.id.startsWith("a-") && !isLiveConnected);
                   return [...mappedAlerts, ...manualAlerts];
                 });
               }

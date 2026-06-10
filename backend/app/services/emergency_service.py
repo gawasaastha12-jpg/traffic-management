@@ -15,7 +15,7 @@ class EmergencyService:
     def __init__(self):
         pass
 
-    def create_emergency_corridor(self, db: Session, payload: dict):
+    async def create_emergency_corridor(self, db: Session, payload: dict):
         """
         Creates, logs, and triggers a new priority emergency corridor.
         """
@@ -107,6 +107,9 @@ class EmergencyService:
             db_corridor = EmergencyCorridorModel(
                 id=corridor_id,
                 vehicle_type=vehicle_type,
+                vehicle_no=vehicle_no,
+                origin_name=origin_name,
+                destination_name=destination_name,
                 priority_level=priority_level,
                 origin_lat=o_lat,
                 origin_lon=o_lon,
@@ -144,10 +147,10 @@ class EmergencyService:
             }
             
             # Async run broadcast
-            asyncio.create_task(websocket_manager.broadcast(creation_payload))
+            await websocket_manager.broadcast(creation_payload)
 
             # 6. Trigger preemption service loop
-            preemption_service.activate_corridor(corridor_id, route_nodes, vehicle_no)
+            await preemption_service.activate_corridor(corridor_id, route_nodes, vehicle_no)
 
             # 7. Broadcast GREEN_CORRIDOR_ACTIVATED
             activation_payload = {
@@ -163,7 +166,7 @@ class EmergencyService:
                 "time_saved": time_saved,
                 "route_coordinates": route_before.get("route_coordinates", [])
             }
-            asyncio.create_task(websocket_manager.broadcast(activation_payload))
+            await websocket_manager.broadcast(activation_payload)
 
             return db_corridor
 
@@ -190,6 +193,9 @@ class EmergencyService:
             db_corridor = EmergencyCorridorModel(
                 id=corridor_id,
                 vehicle_type=vehicle_type,
+                vehicle_no=vehicle_no,
+                origin_name=origin_name,
+                destination_name=destination_name,
                 priority_level=priority_level,
                 origin_lat=o_lat,
                 origin_lon=o_lon,
@@ -214,6 +220,9 @@ class EmergencyService:
                 db_corridor = EmergencyCorridorModel(
                     id=corridor_id,
                     vehicle_type=vehicle_type,
+                    vehicle_no=vehicle_no,
+                    origin_name=origin_name,
+                    destination_name=destination_name,
                     priority_level=priority_level,
                     origin_lat=o_lat,
                     origin_lon=o_lon,
@@ -245,10 +254,10 @@ class EmergencyService:
                 "time_saved": 180,
                 "route_coordinates": fallback_route_coordinates
             }
-            asyncio.create_task(websocket_manager.broadcast(creation_payload))
+            await websocket_manager.broadcast(creation_payload)
 
             try:
-                preemption_service.activate_corridor(corridor_id, fallback_route_nodes, vehicle_no)
+                await preemption_service.activate_corridor(corridor_id, fallback_route_nodes, vehicle_no)
             except Exception as preempt_err:
                 print(f"[EmergencyService] Preemption activation fallback failed: {preempt_err}")
 
@@ -265,7 +274,7 @@ class EmergencyService:
                 "time_saved": 180,
                 "route_coordinates": fallback_route_coordinates
             }
-            asyncio.create_task(websocket_manager.broadcast(activation_payload))
+            await websocket_manager.broadcast(activation_payload)
             
             return db_corridor
 

@@ -14,6 +14,8 @@ import {
   TrendingUp,
   AlertTriangle,
   FileSpreadsheet,
+  Brain,
+  Navigation,
 } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -28,22 +30,84 @@ import {
   PieChart,
   Pie,
 } from "recharts";
-import { DENSITY_TRENDS, VEHICLE_COUNTS, WAIT_TIME_BY_JUNCTION } from "@/lib/mockData";
+import { DENSITY_TRENDS } from "@/lib/mockData";
 
 export default function Dashboard() {
-  const { junctions, alerts, ambulances, resolveAlert, currentUser } = useTraffic();
+  const { junctions, alerts, ambulances, resolveAlert, currentUser, activeCorridor } = useTraffic();
   const isOperator = currentUser?.role === "Traffic Operations Manager";
 
   // Compute live statistics
   const totalJunctions = junctions.length;
   const operationalJunctions = junctions.filter(j => j.status !== "critical").length;
   const avgCongestion = Math.round(
-    junctions.reduce((sum, j) => sum + j.congestionLevel, 0) / totalJunctions
+    junctions.reduce((sum, j) => sum + j.congestionLevel, 0) / (totalJunctions || 1)
   );
   const activeAmbulances = ambulances.filter(a => a.status === "En-Route" || a.status === "Stuck").length;
   const activeCorridors = junctions.filter(j => j.greenCorridorActive).length;
 
   const unresolvedAlerts = alerts.filter((a) => !a.resolved);
+
+  // Dynamic charts mapping
+  const waitTimeData = junctions.map((j) => {
+    const displayName = j.name.replace(" Junction", "").replace(" Hospital", "");
+    return {
+      name: displayName,
+      current: j.averageWaitTime,
+      target: 45,
+    };
+  });
+
+  const vehicleSplitData = [
+    { name: "Cars", count: Math.round(avgCongestion * 50 + 1200), color: "#10b981" },
+    { name: "Two-Wheelers", count: Math.round(avgCongestion * 25 + 600), color: "#a855f7" },
+    { name: "Auto-Rickshaws", count: Math.round(avgCongestion * 18 + 400), color: "#f59e0b" },
+    { name: "Buses / Trucks", count: Math.round(avgCongestion * 10 + 200), color: "#06b6d4" },
+    { name: "Emergency", count: activeAmbulances, color: "#f43f5e" }
+  ];
+
+  const densityTrendsData = [
+    ...DENSITY_TRENDS.slice(0, DENSITY_TRENDS.length - 1),
+    { time: "NOW", average: avgCongestion, peak: Math.min(100, Math.round(avgCongestion * 1.25)) }
+  ];
+
+  // AI Alternate route suggestions
+  const alternateRouteSuggestions = (() => {
+    const congested = junctions.filter((j) => j.congestionLevel > 50);
+    if (congested.length === 0) {
+      return [
+        {
+          id: "sug-clear",
+          junctionName: "All Sectors Clear",
+          recommendation: "Traffic flow is optimal. No active rerouting required.",
+          savings: "0 min",
+        },
+      ];
+    }
+    return congested.map((j) => {
+      let altRoute = "ITPL Bypass";
+      let savingsMin = Math.round(j.congestionLevel * 0.15 + 2);
+
+      if (j.id === "WF_J_001") {
+        altRoute = "Channasandra Main Road / Kadugodi Link";
+      } else if (j.id === "WF_J_002") {
+        altRoute = "Hoodi Main Road via ECC Road";
+      } else if (j.id === "WF_J_003") {
+        altRoute = "Kundalahalli Lake Bypass Road";
+      } else if (j.id === "WF_J_004") {
+        altRoute = "HAL Airport Road via Marathahalli";
+      } else if (j.id === "WF_J_005") {
+        altRoute = "Whitefield Road via Pattandur Agrahara";
+      } else if (j.id === "WF_J_006") {
+        altRoute = "Varthur Bypass / Gunjur Road";
+      }
+      return {
+        id: `sug-${j.id}`,
+        junctionName: j.name,
+        recommendation: `Divert transit flow via ${altRoute} to bypass bottleneck.`,
+        savings: `${savingsMin} min`,
+      };
+    });
+  })();
 
   return (
     <div className="flex flex-col gap-6">
@@ -141,6 +205,32 @@ export default function Dashboard() {
               )}
             </div>
 
+            {/* Real-time preemption corridor tracker */}
+            {activeCorridor && (
+              <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl flex flex-col gap-2 font-mono text-[11px] mb-1.5 animate-pulse">
+                <div className="flex justify-between items-center">
+                  <span className="font-bold text-red-400 flex items-center gap-1">
+                    <Siren className="h-3.5 w-3.5 text-red-450 animate-bounce" />
+                    PREEMPTION ACTIVE
+                  </span>
+                  <span className="text-slate-400">{activeCorridor.progress}%</span>
+                </div>
+                <div className="flex justify-between text-slate-300">
+                  <span className="font-bold">{activeCorridor.vehicleNo}</span>
+                  <span className="text-cyan-400">{activeCorridor.etaRemaining}s remaining</span>
+                </div>
+                <div className="text-[9px] text-slate-500 truncate">
+                  {activeCorridor.source} &rarr; {activeCorridor.destination}
+                </div>
+                <div className="w-full bg-slate-950 h-1.5 rounded-full overflow-hidden border border-slate-900">
+                  <div
+                    className="h-full bg-gradient-to-r from-red-500 to-amber-500 transition-all duration-1000"
+                    style={{ width: `${activeCorridor.progress}%` }}
+                  />
+                </div>
+              </div>
+            )}
+
             <div className="flex-1 overflow-y-auto flex flex-col gap-2.5 max-h-[160px]">
               {unresolvedAlerts.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full text-slate-500 text-xs font-mono py-8">
@@ -182,13 +272,13 @@ export default function Dashboard() {
           </div>
 
           {/* Traffic Warnings (High Congestion Junction list) */}
-          <div className="glass-panel p-5 rounded-2xl flex flex-col gap-3 flex-1 overflow-hidden">
+          <div className="glass-panel p-5 rounded-2xl flex flex-col gap-3 min-h-[220px] overflow-hidden">
             <h3 className="text-xs font-extrabold text-slate-200 tracking-wider uppercase font-mono flex items-center gap-2 border-b border-slate-800/40 pb-2">
               <AlertTriangle className="h-4.5 w-4.5 text-amber-500" />
               Congestion Warnings
             </h3>
 
-            <div className="flex-1 overflow-y-auto flex flex-col gap-2">
+            <div className="flex-1 overflow-y-auto flex flex-col gap-2 max-h-[160px]">
               {junctions
                 .filter((j) => j.congestionLevel > 50)
                 .sort((a, b) => b.congestionLevel - a.congestionLevel)
@@ -230,6 +320,47 @@ export default function Dashboard() {
                 ))}
             </div>
           </div>
+
+          {/* AI Alternate Route Suggestions */}
+          <div className="glass-panel p-5 rounded-2xl flex flex-col gap-3 min-h-[225px] overflow-hidden">
+            <h3 className="text-xs font-extrabold text-slate-200 tracking-wider uppercase font-mono flex items-center gap-2 border-b border-slate-800/40 pb-2">
+              <Brain className="h-4.5 w-4.5 text-cyan-400" />
+              AI Route Recommendations
+            </h3>
+
+            <div className="flex-1 overflow-y-auto flex flex-col gap-2.5 max-h-[160px]">
+              {alternateRouteSuggestions.map((sug) => {
+                const isClear = sug.id === "sug-clear";
+                return (
+                  <div
+                    key={sug.id}
+                    className={`p-3 rounded-xl border flex flex-col gap-1.5 transition-all ${
+                      isClear
+                        ? "bg-slate-900/40 border-slate-800 text-slate-500"
+                        : "bg-cyan-500/5 border-cyan-500/20 text-cyan-300"
+                    }`}
+                  >
+                    <div className="flex justify-between items-center">
+                      <span className="font-bold text-[10px] uppercase font-mono tracking-wide truncate max-w-[185px]">
+                        {sug.junctionName}
+                      </span>
+                      {!isClear && (
+                        <span className="text-[9px] px-1.5 py-0.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded font-bold font-mono">
+                          Saved: {sug.savings}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-start gap-1.5">
+                      {!isClear && <Navigation className="h-3.5 w-3.5 text-cyan-400 rotate-45 shrink-0 mt-0.5" />}
+                      <p className="text-[10px] leading-normal text-slate-400 font-mono">
+                        {sug.recommendation}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         </div>
       </div>
 
@@ -246,7 +377,7 @@ export default function Dashboard() {
           </div>
           <div className="h-56 w-full font-mono text-[10px]">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={DENSITY_TRENDS}>
+              <LineChart data={densityTrendsData}>
                 <XAxis dataKey="time" stroke="#475569" />
                 <YAxis stroke="#475569" />
                 <Tooltip
@@ -265,7 +396,7 @@ export default function Dashboard() {
         <div className="glass-panel p-5 rounded-2xl flex flex-col gap-4">
           <div className="flex justify-between items-center border-b border-slate-800/40 pb-2">
             <h3 className="text-xs font-bold text-slate-300 tracking-wider uppercase font-mono flex items-center gap-2">
-              <Activity className="h-4 w-4 text-emerald-400" />
+              <Activity className="h-4.5 w-4.5 text-emerald-400" />
               Vehicle Split
             </h3>
             <span className="text-[10px] text-slate-500 font-mono">TODAY</span>
@@ -275,7 +406,7 @@ export default function Dashboard() {
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
-                    data={VEHICLE_COUNTS}
+                    data={vehicleSplitData}
                     cx="50%"
                     cy="50%"
                     innerRadius={50}
@@ -283,7 +414,7 @@ export default function Dashboard() {
                     paddingAngle={3}
                     dataKey="count"
                   >
-                    {VEHICLE_COUNTS.map((entry, index) => (
+                    {vehicleSplitData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
                   </Pie>
@@ -291,13 +422,13 @@ export default function Dashboard() {
               </ResponsiveContainer>
             </div>
             <div className="flex flex-col gap-2 w-1/2 justify-center pl-2">
-              {VEHICLE_COUNTS.map((entry) => (
+              {vehicleSplitData.map((entry) => (
                 <div key={entry.name} className="flex flex-col">
                   <div className="flex items-center gap-1.5 text-xs text-slate-300 font-semibold">
-                    <span className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color }} />
-                    <span className="truncate">{entry.name}</span>
+                    <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: entry.color }} />
+                    <span className="truncate text-[10px]">{entry.name}</span>
                   </div>
-                  <span className="text-[10px] text-slate-500 font-mono pl-3">
+                  <span className="text-[9px] text-slate-500 font-mono pl-4">
                     {entry.count.toLocaleString()} vehicles
                   </span>
                 </div>
@@ -317,7 +448,7 @@ export default function Dashboard() {
           </div>
           <div className="h-56 w-full font-mono text-[9px]">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={WAIT_TIME_BY_JUNCTION}>
+              <BarChart data={waitTimeData}>
                 <XAxis dataKey="name" stroke="#475569" tickFormatter={(v) => v.split(" ")[0]} />
                 <YAxis stroke="#475569" />
                 <Tooltip
@@ -325,7 +456,7 @@ export default function Dashboard() {
                   itemStyle={{ color: "#f1f5f9" }}
                 />
                 <Bar dataKey="current" fill="#f59e0b" name="Current Wait">
-                  {WAIT_TIME_BY_JUNCTION.map((entry, index) => {
+                  {waitTimeData.map((entry, index) => {
                     const matchedJunction = junctions.find((j) => j.name.startsWith(entry.name));
                     const isCorridor = matchedJunction?.greenCorridorActive;
                     return (

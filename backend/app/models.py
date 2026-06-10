@@ -42,6 +42,9 @@ class EmergencyCorridorModel(Base):
 
     id = Column(String, primary_key=True, index=True)
     vehicle_type = Column(String, nullable=False) # ambulance, fire, police
+    vehicle_no = Column(String, nullable=True)
+    origin_name = Column(String, nullable=True)
+    destination_name = Column(String, nullable=True)
     priority_level = Column(Integer, default=1) # 1, 2, 3
     origin_lat = Column(Float, nullable=False)
     origin_lon = Column(Float, nullable=False)
