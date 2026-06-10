@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # RENEW - Smart Traffic Intelligence (Phase 2: Live Digital Twin)
 
 RENEW is a real-time Traffic Intelligence Digital Twin and Micro-Simulation Portal representing Bengaluru (Whitefield) traffic. Phase 2 features live integration frameworks for TomTom (live flow & incidents), OpenWeatherMap (precipitations & visibility risks), OpenRouteService Routing (dynamic ETA matrices), and local NetworkX/SUMO micro-simulations.
@@ -165,3 +166,28 @@ The frontend runs as a Next.js server that communicates with your backend.
    * `NEXT_PUBLIC_WS_URL` = `wss://renew-backend.onrender.com` *(Replace with your deployed backend WebSocket URL)*
 
 Now, access your frontend URL, and you're good to go!
+=======
+RENEW — Smart Traffic Intelligence System
+   Predict · Prevent · Optimize
+Renew is an AI-powered smart traffic management system built for Bangalore's urban road network. It predicts congestion before it happens, automatically adjusts traffic signals in real time, and clears emergency corridors for ambulances — all from a single live operator dashboard.
+
+How It Works
+Predict — AI models analyze live junction data and forecast congestion up to 30 minutes ahead for each junction in the sector.
+Prevent — A swarm of signal agents coordinate with each other to redistribute green phases and prevent gridlock before it forms.
+Optimize — When an emergency vehicle is dispatched, the system computes the fastest route and turns every signal along that path green automatically.
+The dashboard streams live telemetry from all junctions via WebSocket, showing real-time congestion levels, active ambulances, and alert notifications for operators.
+
+Tech Stack
+Backend - FastAPI (Python)
+Road Graph - OSMnx + NetworkX (OpenStreetMap)
+Traffic Data - TomTom API (with local simulation fallback)
+Weather Data - OpenWeatherMap API
+AI / ML - PyTorch, scikit-learn (LSTM + GNN models)
+Simulation - NetworkX local sim (50 vehicles)
+Frontend	- Next.js + React
+Map - Leaflet.js
+Real-time - WebSocket
+Styling  - Tailwind CSS
+
+App runs at https://renew-f83p.onrender.com/
+>>>>>>> bd6dc7b26fdc29de4f8249be40159dad499dd1d6
