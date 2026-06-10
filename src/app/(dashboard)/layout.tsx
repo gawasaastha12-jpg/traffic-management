@@ -25,7 +25,9 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { currentUser, logout, alerts } = useTraffic();
+  const { currentUser, logout, alerts, junctions } = useTraffic();
+  const totalJunctions = junctions.length;
+  const operationalJunctions = junctions.filter(j => j.status !== "critical").length;
   const pathname = usePathname();
   const router = useRouter();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -267,7 +269,7 @@ export default function DashboardLayout({
             <span className="text-sm text-slate-400 font-mono">SECTOR RADAR STATUS:</span>
             <span className="text-[11px] font-bold text-emerald-400 px-2.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 font-mono tracking-wider flex items-center gap-1.5 shadow-[0_0_10px_rgba(16,185,129,0.15)]">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block animate-pulse" />
-              7/7 JUNCTIONS OPERATIONAL
+              {operationalJunctions}/{totalJunctions} JUNCTIONS OPERATIONAL
             </span>
           </div>
           <div className="flex items-center gap-6">

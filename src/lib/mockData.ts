@@ -10,6 +10,7 @@ export interface Junction {
   signalMode: "Adaptive AI" | "Manual Override" | "Fixed Timing";
   greenCorridorActive: boolean;
   averageWaitTime: number; // in seconds
+  dataSource?: "live" | "simulated";
 }
 
 export interface EmergencyAlert {

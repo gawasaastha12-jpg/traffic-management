@@ -278,7 +278,8 @@ export function TrafficProvider({ children }: { children: React.ReactNode }) {
                     activeLanes: j.green_corridor_active ? 4 : 3,
                     signalMode: j.signal_mode,
                     greenCorridorActive: j.green_corridor_active,
-                    averageWaitTime: j.average_wait_time
+                    averageWaitTime: j.average_wait_time,
+                    dataSource: j.data_source || "simulated"
                   };
                 });
                 setJunctions(mappedJunctions);

@@ -91,9 +91,19 @@ export default function JunctionsPage() {
                   <span className={`text-xs font-bold ${isSelected ? "text-cyan-400" : "text-slate-200"} truncate`}>
                     {junction.name}
                   </span>
-                  <span className="text-[10px] font-mono text-slate-500">
-                    Mode: {junction.signalMode}
-                  </span>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-[10px] font-mono text-slate-500">
+                      Mode: {junction.signalMode}
+                    </span>
+                    <span className={`text-[8px] font-mono font-bold px-1 rounded-sm flex items-center gap-0.5 ${
+                      junction.dataSource === "live" 
+                        ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" 
+                        : "bg-blue-500/10 text-blue-400 border border-blue-500/20"
+                    }`}>
+                      <span className={`w-1 h-1 rounded-full ${junction.dataSource === "live" ? "bg-emerald-400 animate-pulse" : "bg-blue-400"}`} />
+                      {junction.dataSource === "live" ? "LIVE" : "SIMULATED"}
+                    </span>
+                  </div>
                 </div>
                 <div className="flex items-center gap-3">
                   <span
@@ -122,6 +132,14 @@ export default function JunctionsPage() {
                   <span className="font-bold text-slate-300">LIVE FEED: FEED_{selectedJunction.id.toUpperCase()}</span>
                 </div>
                 <div className="flex items-center gap-3">
+                  <span className={`text-[9px] font-mono font-bold px-2 py-0.5 rounded border flex items-center gap-1 ${
+                    selectedJunction.dataSource === "live"
+                      ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                      : "bg-blue-500/10 text-blue-400 border-blue-500/20"
+                  }`}>
+                    <span className={`w-1 h-1 rounded-full ${selectedJunction.dataSource === "live" ? "bg-emerald-400 animate-pulse" : "bg-blue-400"}`} />
+                    {selectedJunction.dataSource === "live" ? "LIVE DATA" : "SIMULATED DATA"}
+                  </span>
                   <span className="text-[10px] text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
                     fps: 30.0
                   </span>

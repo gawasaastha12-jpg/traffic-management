@@ -108,7 +108,7 @@ class TrafficIngestionService:
                     f"?key={self.api_key}&point={j.latitude},{j.longitude}"
                 )
                 try:
-                    response = requests.get(url, timeout=2)
+                    response = requests.get(url, timeout=15)
                     if response.status_code == 200:
                         flow_data = response.json().get("flowSegmentData", {})
                         current_speed = flow_data.get("currentSpeed", 40)
@@ -117,6 +117,7 @@ class TrafficIngestionService:
                         # Calculate congestion ratio
                         ratio = max(0, min(100, int((1 - (current_speed / max(1, free_speed))) * 100)))
                         congestion = ratio
+                        j.data_source = "live"
                     else:
                         print(f"[TrafficService] Flow request failed for {j.name} with status {response.status_code}. Using simulation fallback.")
                         use_fallback = True
@@ -128,6 +129,7 @@ class TrafficIngestionService:
             if use_fallback:
                 change = random.choice([-5, -3, 0, 3, 5])
                 congestion = max(10, min(100, congestion + change))
+                j.data_source = "simulated"
 
             # Update database
             j.congestion_level = congestion
@@ -143,7 +145,8 @@ class TrafficIngestionService:
                 "congestion_level": j.congestion_level,
                 "signal_mode": j.signal_mode,
                 "green_corridor_active": j.green_corridor_active,
-                "average_wait_time": j.average_wait_time
+                "average_wait_time": j.average_wait_time,
+                "data_source": j.data_source
             })
 
         db.commit()

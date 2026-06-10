@@ -210,6 +210,14 @@ export default function InteractiveMap() {
                     <span className="text-slate-400">Signal Mode:</span>
                     <span className="font-semibold text-cyan-400">{junction.signalMode}</span>
                   </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Data Source:</span>
+                    <span className={`font-semibold ${
+                      junction.dataSource === "live" ? "text-emerald-400" : "text-blue-400"
+                    }`}>
+                      {junction.dataSource === "live" ? "🟢 LIVE" : "🔵 SIMULATED"}
+                    </span>
+                  </div>
                 </div>
 
                 <div className="flex flex-col gap-1.5 pt-1">

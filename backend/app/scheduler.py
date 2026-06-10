@@ -51,7 +51,8 @@ async def traffic_polling_task():
                     "congestion_level": j.congestion_level,
                     "signal_mode": j.signal_mode,
                     "green_corridor_active": j.green_corridor_active,
-                    "average_wait_time": j.average_wait_time
+                    "average_wait_time": j.average_wait_time,
+                    "data_source": j.data_source
                 } for j in junctions_after]
                 
                 # 2. Ingest weather details

@@ -198,7 +198,16 @@ export default function Dashboard() {
                     className="flex items-center justify-between p-2.5 rounded-xl bg-slate-950/40 border border-slate-900 hover:border-slate-800 transition-colors"
                   >
                     <div className="flex flex-col">
-                      <span className="text-xs font-bold text-slate-300">{junction.name}</span>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-xs font-bold text-slate-300">{junction.name}</span>
+                        <span className={`text-[8px] font-mono font-bold px-1 rounded-sm flex items-center gap-0.5 ${
+                          junction.dataSource === "live"
+                            ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                            : "bg-blue-500/10 text-blue-400 border border-blue-500/20"
+                        }`}>
+                          {junction.dataSource === "live" ? "LIVE" : "SIM"}
+                        </span>
+                      </div>
                       <span className="text-[10px] text-slate-500 font-mono">
                         Queue: {junction.queueLength}m | Wait: {junction.averageWaitTime}s
                       </span>

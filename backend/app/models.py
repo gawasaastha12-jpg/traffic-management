@@ -13,6 +13,7 @@ class JunctionModel(Base):
     signal_mode = Column(String, default="Adaptive AI")
     green_corridor_active = Column(Boolean, default=False)
     average_wait_time = Column(Float, default=0.0)
+    data_source = Column(String, default="simulated")
 
 class IncidentModel(Base):
     __tablename__ = "incidents"
