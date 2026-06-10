@@ -46,6 +46,36 @@ def get_live_incidents(db: Session = Depends(get_db)):
         return traffic_service.fetch_live_incidents(db)
     return incidents
 
+@router.get("/predictions")
+def get_traffic_predictions(db: Session = Depends(get_db)):
+    """
+    Calculates GCN spatial convolved bottleneck forecasting for the next 6 hours.
+    """
+    junctions = db.query(JunctionModel).all()
+    if not junctions:
+        traffic_service._initialize_default_junctions(db)
+        junctions = db.query(JunctionModel).all()
+    
+    densities = {j.id: j.congestion_level for j in junctions}
+    from app.services.ai_service import gcn_forecaster
+    predictions = gcn_forecaster.predict_forecasts(densities)
+    return predictions
+
+@router.get("/camera/{junction_id}")
+def get_camera_telemetry(junction_id: str, db: Session = Depends(get_db)):
+    """
+    Simulates CCTV stream, runs YOLOv8 model inference on virtual frame,
+    and returns the active bounding box detections.
+    """
+    junction = db.query(JunctionModel).filter(JunctionModel.id == junction_id).first()
+    queue_len = 20.0
+    if junction:
+        queue_len = float(junction.congestion_level * 4.2)
+        
+    from app.services.ai_service import yolo_detector
+    result = yolo_detector.detect_vehicles(junction_id, queue_len)
+    return result
+
 @router.post("/corridor/{junction_id}")
 def toggle_corridor(junction_id: str, db: Session = Depends(get_db)):
     """

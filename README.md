@@ -1,24 +1,25 @@
-<<<<<<< HEAD
 # RENEW - Smart Traffic Intelligence (Phase 2: Live Digital Twin)
 
 RENEW is a real-time Traffic Intelligence Digital Twin and Micro-Simulation Portal representing Bengaluru (Whitefield) traffic. Phase 2 features live integration frameworks for TomTom (live flow & incidents), OpenWeatherMap (precipitations & visibility risks), OpenRouteService Routing (dynamic ETA matrices), and local NetworkX/SUMO micro-simulations.
+
+It predicts congestion before it happens, automatically adjusts traffic signals in real time, and clears emergency corridors for ambulances — all from a single live operator or commuter dashboard.
 
 ---
 
 ## 🏗️ Project Architecture
 
 * **Frontend**: Next.js 16 + TypeScript + Tailwind CSS + Leaflet maps (dynamic client-only rendering)
-* **Backend**: FastAPI + SQLite (local database telemetry) + OSMnx/NetworkX (file-based GraphML road grids)
+* **Backend**: FastAPI + SQLite/PostgreSQL (SQLAlchemy ORM) + OSMnx/NetworkX (file-based GraphML road grids)
 * **WebSockets**: In-memory WebSocket ConnectionManager for real-time live map broadcasts
 
 ---
 
-## 🚀 Get Started
+## 🚀 Get Started Locally
 
-Follow these steps to run both the frontend and backend entirely on your Windows laptop.
+Follow these steps to run both the frontend and backend entirely on your machine.
 
 ### Prerequisite
-Ensure **Node.js (v20+)** and **Python (v3.10+)** are installed on your Windows machine and available in your shell's PATH.
+Ensure **Node.js (v20+)** and **Python (v3.10+)** are installed on your machine and available in your shell's PATH.
 
 ---
 
@@ -48,9 +49,8 @@ Ensure **Node.js (v20+)** and **Python (v3.10+)** are installed on your Windows 
    ```bash
    pip install -r requirements.txt
    ```
-   *(Note: This installs `osmnx` and its dependencies. If you are using Python 3.14 on Windows, pip will automatically fetch pre-release compatible wheels).*
 
-5. Configure your API keys in the `backend/.env` file:
+5. Configure your API keys in the `backend/.env` file (copy from `.env.example`):
    ```env
    TOMTOM_API_KEY=YOUR_TOMTOM_API_KEY
    OPENWEATHER_API_KEY=YOUR_OPENWEATHER_API_KEY
@@ -67,7 +67,7 @@ Ensure **Node.js (v20+)** and **Python (v3.10+)** are installed on your Windows 
    npm install
    ```
 
-2. Start the application. You can either run both services concurrently, or start them in separate terminals:
+2. Start the application:
 
    * **Option A: Run everything concurrently (Recommended)**
      ```bash
@@ -99,43 +99,69 @@ Once both servers are running:
 5. **Simulation Engine (SUMO)**: 
    * If you have SUMO installed on your Windows machine, launch the SUMO server listening on port `8813`. The backend's `SumoAdapter` will automatically interface with it.
    * If SUMO is not found, the server silently falls back to a lightweight, built-in NetworkX routing flow simulator.
-=======
-RENEW — Smart Traffic Intelligence System
 
-Predict · Prevent · Optimize
+---
 
-Renew is an AI-powered smart traffic management system built for Bangalore's urban road network. It predicts congestion before it happens, automatically adjusts traffic signals in real time, and clears emergency corridors for ambulances — all from a single live operator dashboard.
+## ☁️ Deploying on Render
 
-How It Works-
+To deploy RENEW in the cloud, you can deploy both the frontend (Next.js) and the backend (FastAPI) as services on [Render](https://render.com).
 
-Predict — AI models analyze live junction data and forecast congestion up to 30 minutes ahead for each junction in the sector.
-Prevent — A swarm of signal agents coordinate with each other to redistribute green phases and prevent gridlock before it forms.
-Optimize — When an emergency vehicle is dispatched, the system computes the fastest route and turns every signal along that path green automatically.
+### 1. Deploying the FastAPI Backend (Web Service via Docker)
+Since the backend uses spatial analysis packages (`osmnx`, `shapely`, `pyproj`), it requires underlying system libraries like `libgeos-dev` and `libproj-dev`. Therefore, it must be deployed on Render using the provided **Dockerfile**.
 
-The dashboard streams live telemetry from all junctions via WebSocket, showing real-time congestion levels, active ambulances, and alert notifications for operators.
+1. Go to the Render Dashboard and click **New +** -> **Web Service**.
+2. Connect your Git repository.
+3. Configure the following settings:
+   * **Name**: `renew-backend`
+   * **Language**: `Docker`
+   * **Root Directory**: `backend` *(This points Render to compile from the subfolder)*
+   * **Dockerfile Path**: `Dockerfile`
+   * **Docker Build Context**: `.` *(relative to the Root Directory)*
+   * **Instance Type**: `Free`
+4. Add the following **Environment Variables** in the Service Settings:
+   * `PORT` = `8000`
+   * `TOMTOM_API_KEY` = `(Your Key)` *(Optional)*
+   * `OPENWEATHER_API_KEY` = `(Your Key)` *(Optional)*
+   * `ORS_API_KEY` = `(Your Key)` *(Optional)*
+   * `DATABASE_URL` = *(See Database Persistence section below)*
 
-Tech Stack
-Backend - FastAPI (Python)
-Road Graph - OSMnx + NetworkX (OpenStreetMap)
-Traffic Data - TomTom API (with local simulation fallback)
-Weather -  DataOpenWeatherMap API
-AI / ML - PyTorch, scikit-learn (LSTM + GNN models)
-Simulation - NetworkX local sim (50 vehicles)
-Frontend - Next.js + React
-Map - Leaflet.js
-Real-time -WebSocket
-Styling -Tailwind CSS
+---
 
-Running Locally
-bash# Backend
-cd backend
-pip install -r requirements.txt
-uvicorn app.main:app --reload
+### 💾 Handling Database Persistence on Render's Free Plan
+On Render's Free tier, **persistent disks (volumes) are not available**. If you use a local SQLite database (`sqlite:///./data/renew.db`), the database file is ephemeral and will be reset every time the container restarts or redeploys. 
 
-# Frontend
-cd frontend
-npm install
-npm run dev
+To solve this, choose one of the following two options:
 
-Deployed Link - 
->>>>>>> 71a010ad4c5503098d0f0513a95519dd9958980c
+#### Option A: Ephemeral SQLite (Zero Setup - Perfect for Demos)
+* Do not set `DATABASE_URL` or keep it as `sqlite:///./data/renew.db`.
+* **Behavior**: The backend automatically builds tables and seeds the junctions list on startup. The app will work perfectly during runtime. However, custom overrides, simulation history logs, or weather updates will clear whenever Render restarts the container (at least once per day or upon scaling).
+
+#### Option B: Persistent PostgreSQL Database (Recommended, Free)
+Render offers a free fully managed PostgreSQL database that you can connect to:
+1. On the Render Dashboard, click **New +** -> **PostgreSQL**.
+2. Name the database (e.g. `renew-db`) and choose the **Free** tier.
+3. Once the database is created, find the **Internal Database URL** (which looks like `postgresql://user:password@host/db`).
+4. Go back to your `renew-backend` Web Service -> **Environment** tab.
+5. Set `DATABASE_URL` = `(Your Internal Database URL)`.
+6. **Behavior**: The SQLAlchemy configuration in the backend will automatically detect the PostgreSQL connection, construct all tables, seed default values on startup if missing, and store all configurations, overrides, and logs permanently!
+
+---
+
+### 2. Deploying the Next.js Frontend (Web Service via Node)
+The frontend runs as a Next.js server that communicates with your backend.
+
+1. Go to the Render Dashboard and click **New +** -> **Web Service**.
+2. Connect the same Git repository.
+3. Configure the following settings:
+   * **Name**: `renew-frontend`
+   * **Language**: `Node`
+   * **Root Directory**: `.` *(Leave blank or set to root directory)*
+   * **Build Command**: `npm install && npm run build`
+   * **Start Command**: `npm run start`
+   * **Instance Type**: `Free`
+4. Add the following **Environment Variables**:
+   * **IMPORTANT**: Next.js injects public variables during compilation, so these environment variables must be defined **before** the build completes.
+   * `NEXT_PUBLIC_API_URL` = `https://renew-backend.onrender.com` *(Replace with your deployed backend URL)*
+   * `NEXT_PUBLIC_WS_URL` = `wss://renew-backend.onrender.com` *(Replace with your deployed backend WebSocket URL)*
+
+Now, access your frontend URL, and you're good to go!

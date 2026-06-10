@@ -57,7 +57,7 @@ interface TrafficContextType {
 const TrafficContext = createContext<TrafficContextType | undefined>(undefined);
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
-const WS_BASE = process.env.NEXT_PUBLIC_WS_URL || "ws://127.0.0.1:8000";
+const WS_BASE = process.env.NEXT_PUBLIC_WS_URL || (API_BASE.startsWith("https://") ? API_BASE.replace("https://", "wss://") : API_BASE.replace("http://", "ws://"));
 
 export function TrafficProvider({ children }: { children: React.ReactNode }) {
   const [junctions, setJunctions] = useState<Junction[]>(INITIAL_JUNCTIONS);

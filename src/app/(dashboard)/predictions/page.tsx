@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { CONGESTION_PREDICTIONS } from "@/lib/mockData";
 import {
   TrendingUp,
@@ -22,15 +22,37 @@ import {
 
 export default function PredictionsPage() {
   const [selectedHourIndex, setSelectedHourIndex] = useState(0); // 0 corresponds to +1 Hour, 5 corresponds to +6 Hours
+  const [predictionsData, setPredictionsData] = useState<any[]>(CONGESTION_PREDICTIONS);
+  const [loading, setLoading] = useState(true);
 
-  const currentHourData = CONGESTION_PREDICTIONS[selectedHourIndex];
+  useEffect(() => {
+    const fetchPredictions = async () => {
+      try {
+        const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+        const res = await fetch(`${apiBase}/api/traffic/predictions`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.length > 0) {
+            setPredictionsData(data);
+          }
+        }
+      } catch (e) {
+        console.error("Failed to fetch GCN predictions:", e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchPredictions();
+  }, []);
 
-  // Junction mock mapping based on current selected hours
+  const currentHourData = predictionsData[selectedHourIndex] || predictionsData[0];
+
+  // Junction mapping based on current selected hours
   const predictedJunctions = [
-    { name: "Graphite India Junction", val: currentHourData.Graphite, trend: "up" },
-    { name: "Hope Farm Junction", val: currentHourData.HopeFarm, trend: "up" },
-    { name: "Vydehi Hospital Junction", val: currentHourData.Vydehi, trend: "down" },
-    { name: "Hoodi Junction", val: currentHourData.Hoodi, trend: "neutral" },
+    { name: "Graphite India Junction", val: currentHourData.Graphite ?? currentHourData.GraphiteIndia ?? 40, trend: "up" },
+    { name: "Hope Farm Junction", val: currentHourData.HopeFarm ?? 40, trend: "up" },
+    { name: "Vydehi Hospital Junction", val: currentHourData.Vydehi ?? 40, trend: "down" },
+    { name: "Hoodi Junction", val: currentHourData.Hoodi ?? 40, trend: "neutral" },
   ];
 
   const getStatusColor = (val: number) => {
@@ -134,7 +156,7 @@ export default function PredictionsPage() {
             className="w-full h-2 bg-slate-900 border border-slate-800 rounded-lg appearance-none cursor-pointer accent-cyan-400 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
           />
           <div className="flex justify-between text-[10px] text-slate-500 px-1.5">
-            {CONGESTION_PREDICTIONS.map((p, idx) => (
+            {predictionsData.map((p, idx) => (
               <button
                 key={p.time}
                 onClick={() => setSelectedHourIndex(idx)}
@@ -187,7 +209,7 @@ export default function PredictionsPage() {
         </h3>
         <div className="h-60 w-full font-mono text-[9px]">
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={CONGESTION_PREDICTIONS}>
+            <AreaChart data={predictionsData}>
               <XAxis dataKey="time" stroke="#475569" />
               <YAxis stroke="#475569" />
               <Tooltip

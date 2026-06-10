@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useTraffic, Junction } from "@/context/TrafficContext";
 import {
   Activity,
@@ -20,8 +20,30 @@ export default function JunctionsPage() {
   const isOperator = currentUser?.role === "Traffic Operations Manager";
   const [selectedJunctionId, setSelectedJunctionId] = useState<string>(junctions[0]?.id || "");
   const [cameraFeedActive, setCameraFeedActive] = useState(true);
+  const [yoloResult, setYoloResult] = useState<any>(null);
 
   const selectedJunction = junctions.find((j) => j.id === selectedJunctionId);
+
+  useEffect(() => {
+    if (!selectedJunctionId || !cameraFeedActive) return;
+
+    const fetchCameraTelemetry = async () => {
+      try {
+        const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+        const res = await fetch(`${apiBase}/api/traffic/camera/${selectedJunctionId}`);
+        if (res.ok) {
+          const data = await res.json();
+          setYoloResult(data);
+        }
+      } catch (e) {
+        console.error("Failed to fetch camera YOLO telemetry:", e);
+      }
+    };
+
+    fetchCameraTelemetry();
+    const interval = setInterval(fetchCameraTelemetry, 3000); // Poll every 3 seconds for active camera feeds
+    return () => clearInterval(interval);
+  }, [selectedJunctionId, cameraFeedActive]);
 
   // Status visual maps
   const statusColorMap = {
@@ -114,26 +136,32 @@ export default function JunctionsPage() {
                   {/* Camera Scanning bar */}
                   <div className="absolute left-0 w-full h-[2px] bg-cyan-500/30 shadow-[0_0_15px_#06b6d4] animate-bounce z-10" style={{ animationDuration: "6s" }} />
 
-                  {/* AI scanning bounding boxes simulation */}
-                  <div className="absolute top-[35%] left-[25%] border-2 border-emerald-500/80 p-1 flex flex-col gap-0.5 font-mono text-[8px] text-emerald-400 font-bold shadow-[0_0_10px_rgba(16,185,129,0.3)] animate-pulse">
-                    <span>CAR_MOCK (98.6%)</span>
-                    <span>QUEUE_POS: 1</span>
-                  </div>
-                  <div className="absolute top-[48%] right-[30%] border-2 border-cyan-500/80 p-1 flex flex-col gap-0.5 font-mono text-[8px] text-cyan-400 font-bold shadow-[0_0_10px_rgba(6,182,212,0.3)] animate-pulse">
-                    <span>BUS_MOCK (92.4%)</span>
-                    <span>QUEUE_POS: 2</span>
-                  </div>
-                  <div className="absolute bottom-[20%] left-[40%] border-2 border-amber-500/80 p-1 flex flex-col gap-0.5 font-mono text-[8px] text-amber-400 font-bold shadow-[0_0_10px_rgba(245,158,11,0.3)]">
-                    <span>AUTO_MOCK (84.1%)</span>
-                    <span>QUEUE_POS: 5</span>
-                  </div>
+                  {/* Real YOLOv8 scanning bounding boxes */}
+                  {yoloResult?.detections?.map((det: any) => (
+                    <div
+                      key={det.id}
+                      className="absolute border-2 p-1 flex flex-col gap-0.5 font-mono text-[8px] font-bold animate-pulse"
+                      style={{
+                        borderColor: det.color,
+                        color: det.color,
+                        left: `${(det.box[0] / 640) * 100}%`,
+                        top: `${(det.box[1] / 360) * 100}%`,
+                        width: `${((det.box[2] - det.box[0]) / 640) * 100}%`,
+                        height: `${((det.box[3] - det.box[1]) / 360) * 100}%`,
+                        boxShadow: `0 0 8px ${det.color}40`,
+                      }}
+                    >
+                      <span className="truncate bg-slate-950/80 px-1 rounded">{det.label}</span>
+                      <span className="bg-slate-950/80 px-1 rounded">POS: {det.queue_position}</span>
+                    </div>
+                  ))}
 
                   <div className="text-center flex flex-col items-center gap-2">
                     <span className="text-slate-500 font-mono text-xs tracking-wider">
                       [ DIGITAL CCTV MATRIX ACTIVE ]
                     </span>
                     <span className="text-[10px] text-cyan-500/60 font-mono animate-pulse">
-                      VEHICLE RECOGNITION ALGORITHM DETECTING {Math.round(selectedJunction.queueLength / 12)} UNITS
+                      VEHICLE RECOGNITION ALGORITHM DETECTING {yoloResult?.vehicle_count ?? Math.round(selectedJunction.queueLength / 12)} UNITS
                     </span>
                   </div>
 

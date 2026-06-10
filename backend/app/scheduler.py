@@ -17,9 +17,42 @@ async def traffic_polling_task():
         try:
             db = SessionLocal()
             try:
+                # Keep old state records for Reinforcement Learning updates
+                from app.models import JunctionModel
+                from app.services.ai_service import rl_signal_agent
+                
+                junctions_before = db.query(JunctionModel).all()
+                old_congestion = {j.id: j.congestion_level for j in junctions_before}
+
                 # 1. Ingest traffic flows and incidents
-                flow_data = traffic_service.fetch_live_flow_telemetry(db)
+                traffic_service.fetch_live_flow_telemetry(db)
                 incidents_data = traffic_service.fetch_live_incidents(db)
+                
+                # 2. Run Q-learning optimizations on Adaptive AI signals
+                junctions_after = db.query(JunctionModel).all()
+                for j in junctions_after:
+                    if j.signal_mode == "Adaptive AI" and not j.green_corridor_active:
+                        old_c = old_congestion.get(j.id, 50)
+                        action = rl_signal_agent.select_action(j.id, old_c)
+                        new_c = j.congestion_level
+                        rl_signal_agent.learn_update(j.id, old_c, action, new_c)
+                        
+                        split_seconds = rl_signal_agent.action_labels[action]
+                        j.average_wait_time = int(split_seconds * (new_c / 100.0))
+                        db.add(j)
+                db.commit()
+                
+                # Rebuild flow data containing RL-modified wait times
+                flow_data = [{
+                    "id": j.id,
+                    "name": j.name,
+                    "lat": j.latitude,
+                    "lng": j.longitude,
+                    "congestion_level": j.congestion_level,
+                    "signal_mode": j.signal_mode,
+                    "green_corridor_active": j.green_corridor_active,
+                    "average_wait_time": j.average_wait_time
+                } for j in junctions_after]
                 
                 # 2. Ingest weather details
                 weather_data = weather_service.fetch_live_weather(db)
