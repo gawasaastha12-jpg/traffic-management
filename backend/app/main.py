@@ -62,7 +62,7 @@ app.include_router(routing.router)
 app.include_router(simulation.router)
 app.include_router(emergency.router)
 
-@app.websocket("/api/ws/traffic")
+@app.websocket("/api/ws/grid")
 async def websocket_traffic_endpoint(websocket: WebSocket):
     """
     WebSocket endpoint for real-time traffic broadcasts.

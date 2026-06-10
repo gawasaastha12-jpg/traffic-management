@@ -31,7 +31,8 @@ export default function PredictionsPage() {
         const apiBase = (process.env.NEXT_PUBLIC_API_URL && process.env.NEXT_PUBLIC_API_URL !== "undefined")
           ? process.env.NEXT_PUBLIC_API_URL
           : "http://127.0.0.1:8000";
-        const res = await fetch(`${apiBase}/api/traffic/predictions`);
+        console.log("FETCHING predictions URL:", `${apiBase}/api/grid/predictions`);
+        const res = await fetch(`${apiBase}/api/grid/predictions`);
         if (res.ok) {
           const data = await res.json();
           if (data && data.length > 0) {

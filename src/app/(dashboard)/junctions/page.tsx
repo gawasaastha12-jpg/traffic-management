@@ -32,7 +32,8 @@ export default function JunctionsPage() {
         const apiBase = (process.env.NEXT_PUBLIC_API_URL && process.env.NEXT_PUBLIC_API_URL !== "undefined")
           ? process.env.NEXT_PUBLIC_API_URL
           : "http://127.0.0.1:8000";
-        const res = await fetch(`${apiBase}/api/traffic/camera/${selectedJunctionId}`);
+        console.log("FETCHING camera URL:", `${apiBase}/api/grid/camera/${selectedJunctionId}`);
+        const res = await fetch(`${apiBase}/api/grid/camera/${selectedJunctionId}`);
         if (res.ok) {
           const data = await res.json();
           setYoloResult(data);

@@ -5,7 +5,7 @@ from app.models import JunctionModel, IncidentModel
 from app.services.traffic_service import traffic_service
 from app.services.graph_service import graph_service
 
-router = APIRouter(prefix="/api/traffic", tags=["Traffic"])
+router = APIRouter(prefix="/api/grid", tags=["Grid"])
 
 @router.get("")
 @router.get("/")

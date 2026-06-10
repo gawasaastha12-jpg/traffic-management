@@ -151,7 +151,7 @@ export function TrafficProvider({ children }: { children: React.ReactNode }) {
     const connectWS = () => {
       try {
         console.log("[WS] Connecting to FastAPI traffic broadcast...");
-        socket = new WebSocket(`${WS_BASE}/api/ws/traffic`);
+        socket = new WebSocket(`${WS_BASE}/api/ws/grid`);
 
         socket.onopen = () => {
           console.log("[WS] Connected to live Digital Twin backend!");
@@ -357,7 +357,7 @@ export function TrafficProvider({ children }: { children: React.ReactNode }) {
     // If backend is active, send override post
     if (isLiveConnected) {
       try {
-        await fetch(`${API_BASE}/api/traffic/corridor/${junctionId}`, {
+        await fetch(`${API_BASE}/api/grid/corridor/${junctionId}`, {
           method: "POST"
         });
       } catch (e) {
@@ -373,7 +373,7 @@ export function TrafficProvider({ children }: { children: React.ReactNode }) {
 
     if (isLiveConnected) {
       try {
-        await fetch(`${API_BASE}/api/traffic/mode/${junctionId}`, {
+        await fetch(`${API_BASE}/api/grid/mode/${junctionId}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ mode })
