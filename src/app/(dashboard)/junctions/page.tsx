@@ -29,7 +29,9 @@ export default function JunctionsPage() {
 
     const fetchCameraTelemetry = async () => {
       try {
-        const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+        const apiBase = (process.env.NEXT_PUBLIC_API_URL && process.env.NEXT_PUBLIC_API_URL !== "undefined")
+          ? process.env.NEXT_PUBLIC_API_URL
+          : "http://127.0.0.1:8000";
         const res = await fetch(`${apiBase}/api/traffic/camera/${selectedJunctionId}`);
         if (res.ok) {
           const data = await res.json();
