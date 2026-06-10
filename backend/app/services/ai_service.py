@@ -106,39 +106,33 @@ class STGCNForecaster:
 
     def _initialize_gcn_structure(self):
         """
-        Loads the road graph, compiles adjacency matrices, and normalizes them
-        using graph convolutional laplacian formulas: D^-0.5 * (A + I) * D^-0.5
+        Initializes the spatial GCN adjacency matrix specifically mapped over the 7 seed junctions.
+        Ensures low memory overhead and correct key output names for the dashboard.
         """
-        G = graph_service.G
-        if G is None:
-            graph_service.load_or_download_graph()
-            G = graph_service.G
-
-        if G is None or len(G.nodes) == 0:
-            # Graph load failed, use static default junctions mapping
-            self.junction_ids = ["WF_J_001", "WF_J_002", "WF_J_003", "WF_J_004", "WF_J_005", "WF_J_006", "WF_J_007"]
-            num_nodes = len(self.junction_ids)
-            A = np.eye(num_nodes)
-            # Add simple ring connections
-            for i in range(num_nodes):
-                A[i, (i+1)%num_nodes] = 1.0
-                A[(i+1)%num_nodes, i] = 1.0
-        else:
-            # Map nodes to IDs
-            raw_nodes = list(G.nodes)
-            self.junction_ids = [graph_service.get_clean_junction_id(n) for n in raw_nodes]
-            num_nodes = len(self.junction_ids)
-            
-            # Build Adjacency matrix A from NetworkX edges
-            A = np.zeros((num_nodes, num_nodes))
-            node_to_idx = {raw_nodes[i]: i for i in range(num_nodes)}
-            
-            for u, v, data in G.edges(data=True):
-                if u in node_to_idx and v in node_to_idx:
-                    u_idx = node_to_idx[u]
-                    v_idx = node_to_idx[v]
-                    A[u_idx, v_idx] = 1.0
-                    A[v_idx, u_idx] = 1.0 # Undirected mapping for traffic flow propagation
+        # Seed junctions that match SQLite DB and the Next.js frontend requirements
+        self.junction_ids = ["WF_J_001", "WF_J_002", "WF_J_003", "WF_J_004", "WF_J_005", "WF_J_006", "WF_J_007"]
+        num_nodes = len(self.junction_ids)
+        
+        # Build Adjacency matrix A representing key connecting corridors in Whitefield
+        A = np.zeros((num_nodes, num_nodes))
+        
+        # Topological connection mapping (undirected)
+        connections = {
+            "WF_J_001": ["WF_J_002", "WF_J_005", "WF_J_006", "WF_J_007"], # Hope Farm to Vydehi, Hoodi, Varthur Kodi, Kadugodi
+            "WF_J_002": ["WF_J_001", "WF_J_003", "WF_J_005"],          # Vydehi to Hope Farm, Graphite, Hoodi
+            "WF_J_003": ["WF_J_002", "WF_J_004"],                      # Graphite to Vydehi, Kundalahalli
+            "WF_J_004": ["WF_J_003", "WF_J_006"],                      # Kundalahalli to Graphite, Varthur Kodi
+            "WF_J_005": ["WF_J_001", "WF_J_002"],                      # Hoodi to Hope Farm, Vydehi
+            "WF_J_006": ["WF_J_001", "WF_J_004"],                      # Varthur Kodi to Hope Farm, Kundalahalli
+            "WF_J_007": ["WF_J_001"]                                   # Kadugodi to Hope Farm
+        }
+        
+        for idx, j_id in enumerate(self.junction_ids):
+            for neighbor in connections.get(j_id, []):
+                if neighbor in self.junction_ids:
+                    n_idx = self.junction_ids.index(neighbor)
+                    A[idx, n_idx] = 1.0
+                    A[n_idx, idx] = 1.0
             
         # Graph convolution normalization: A_tilde = A + I
         A_tilde = A + np.eye(len(A))
